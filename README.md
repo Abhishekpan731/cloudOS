@@ -1,10 +1,10 @@
-# CloudOS
+# CloudOS (OpenCloud)
 
 🌟 **The Universal Cloud Operating System** 🌟
 
 A revolutionary lightweight, AI-supported cloud operating system designed for modern distributed computing. CloudOS can run anywhere - from cloud instances to local machines - with seamless master-node architecture and universal connectivity.
 
-[![Build Status](https://github.com/your-org/cloudos/workflows/build/badge.svg)](https://github.com/your-org/cloudos/actions)
+[![Build Status](https://github.com/Abhishekpan731/OpenCloud/workflows/build/badge.svg)](https://github.com/Abhishekpan731/OpenCloud/actions)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-0.1.0-green.svg)](CHANGELOG.md)
 [![Discord](https://img.shields.io/discord/cloudos)](https://discord.gg/cloudos)
@@ -73,22 +73,6 @@ Master-node architecture with intelligent orchestration:
 - **NAT/Firewall Traversal**: Home and office network friendly
 - **Service Discovery**: Automatic node registration and discovery
 - **Load Balancing**: Intelligent traffic distribution
-
-## Architecture
-
-CloudOS is built on a microkernel architecture with the following components:
-
-### Core System
-- **Microkernel**: Minimal kernel handling only essential system calls
-- **AI Engine**: Integrated machine learning runtime for system optimization
-- **Resource Manager**: Intelligent allocation and monitoring of system resources
-- **Network Stack**: High-performance networking optimized for cloud workloads
-
-### AI Components
-- **System Optimizer**: AI-driven performance tuning and resource allocation
-- **Predictive Analytics**: Workload prediction and proactive scaling
-- **Anomaly Detection**: Real-time system health monitoring and issue detection
-- **Auto-Remediation**: Intelligent problem resolution and self-healing capabilities
 
 ## System Requirements
 
@@ -162,8 +146,8 @@ docker run -d --name cloudos-node --privileged \
 
 ```bash
 # Build from source
-git clone https://github.com/your-org/cloudos.git
-cd cloudos
+git clone https://github.com/Abhishekpan731/OpenCloud.git
+cd OpenCloud
 ./scripts/build-docker.sh
 
 # Create local development cluster
@@ -254,8 +238,8 @@ networking:
 ### Building from Source
 ```bash
 # Clone repository
-git clone https://github.com/your-org/cloudos.git
-cd cloudos
+git clone https://github.com/Abhishekpan731/OpenCloud.git
+cd OpenCloud
 
 # Build kernel (requires Docker)
 ./scripts/build-docker.sh
@@ -341,7 +325,7 @@ Built-in monitoring with:
 
 - 📖 **Documentation**: https://docs.cloudos.dev
 - 💬 **Community Forum**: https://community.cloudos.dev
-- 🐛 **Bug Reports**: https://github.com/your-org/cloudos/issues
+- 🐛 **Bug Reports**: https://github.com/Abhishekpan731/OpenCloud/issues
 - 💭 **Discord Chat**: https://discord.gg/cloudos
 - 🐦 **Twitter**: [@CloudOSProject](https://twitter.com/cloudosproject)
 - 📧 **Enterprise Support**: enterprise@cloudos.dev
