@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  cloudos-dev:
+    build: .
+    container_name: cloudos-dev
+    volumes:
+      - .:/cloudos
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+    environment:
+      - DISPLAY=${DISPLAY}
+    working_dir: /cloudos
+    tty: true
+    stdin_open: true
