@@ -1,0 +1,251 @@
+<mxfile host="app.diagrams.net" modified="2024-01-15T10:00:00.000Z" agent="CloudOS Design" etag="architecture-v1.0" version="22.1.16" type="device">
+  <diagram name="Microkernel Architecture" id="microkernel-arch">
+    <mxGraphModel dx="1422" dy="794" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- Hardware Layer -->
+        <mxCell id="hw-layer" value="Hardware Layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=16;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="50" y="700" width="1069" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- CPU -->
+        <mxCell id="cpu" value="CPU&#xa;x86_64 / ARM64" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00" vertex="1" parent="1">
+          <mxGeometry x="80" y="720" width="120" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- Memory -->
+        <mxCell id="memory" value="Memory&#xa;DDR4/DDR5" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00" vertex="1" parent="1">
+          <mxGeometry x="220" y="720" width="120" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- Storage -->
+        <mxCell id="storage" value="Storage&#xa;NVMe/SSD" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00" vertex="1" parent="1">
+          <mxGeometry x="360" y="720" width="120" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- Network -->
+        <mxCell id="network" value="Network&#xa;Ethernet/WiFi" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00" vertex="1" parent="1">
+          <mxGeometry x="500" y="720" width="120" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- HAL Layer -->
+        <mxCell id="hal-layer" value="Hardware Abstraction Layer (HAL)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=16;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="50" y="600" width="1069" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- HAL Components -->
+        <mxCell id="hal-cpu" value="CPU Management" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6" vertex="1" parent="1">
+          <mxGeometry x="80" y="620" width="120" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="hal-mem" value="Memory Control" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6" vertex="1" parent="1">
+          <mxGeometry x="220" y="620" width="120" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="hal-int" value="Interrupt Handling" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6" vertex="1" parent="1">
+          <mxGeometry x="360" y="620" width="120" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="hal-timer" value="Timer Services" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6" vertex="1" parent="1">
+          <mxGeometry x="500" y="620" width="120" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- Microkernel Core -->
+        <mxCell id="kernel-layer" value="Microkernel Core (&lt;50KB)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=16;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="50" y="450" width="1069" height="120" as="geometry" />
+        </mxCell>
+
+        <!-- Kernel Components -->
+        <mxCell id="scheduler" value="Process&#xa;Scheduler" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffd966;strokeColor=#b8b000" vertex="1" parent="1">
+          <mxGeometry x="80" y="480" width="100" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="memory-mgmt" value="Memory&#xa;Manager" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffd966;strokeColor=#b8b000" vertex="1" parent="1">
+          <mxGeometry x="200" y="480" width="100" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="ipc" value="IPC&#xa;System" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffd966;strokeColor=#b8b000" vertex="1" parent="1">
+          <mxGeometry x="320" y="480" width="100" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="syscall" value="System Call&#xa;Interface" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffd966;strokeColor=#b8b000" vertex="1" parent="1">
+          <mxGeometry x="440" y="480" width="100" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="security-core" value="Security&#xa;Core" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffd966;strokeColor=#b8b000" vertex="1" parent="1">
+          <mxGeometry x="560" y="480" width="100" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- User Space Services -->
+        <mxCell id="userspace-layer" value="User Space Services" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=16;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="50" y="200" width="1069" height="220" as="geometry" />
+        </mxCell>
+
+        <!-- File System Services -->
+        <mxCell id="fs-services" value="File System Services" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#b0e3e6;strokeColor=#0e8088" vertex="1" parent="1">
+          <mxGeometry x="80" y="230" width="180" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="vfs" value="VFS" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#a0c4ff;strokeColor=#0066cc" vertex="1" parent="1">
+          <mxGeometry x="90" y="250" width="40" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="cloudfs" value="CloudFS" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#a0c4ff;strokeColor=#0066cc" vertex="1" parent="1">
+          <mxGeometry x="140" y="250" width="50" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="tmpfs" value="tmpfs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#a0c4ff;strokeColor=#0066cc" vertex="1" parent="1">
+          <mxGeometry x="200" y="250" width="50" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="devfs" value="devfs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#a0c4ff;strokeColor=#0066cc" vertex="1" parent="1">
+          <mxGeometry x="90" y="280" width="50" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Network Services -->
+        <mxCell id="net-services" value="Network Services" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#b0e3e6;strokeColor=#0e8088" vertex="1" parent="1">
+          <mxGeometry x="290" y="230" width="180" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="tcp-stack" value="TCP/IP Stack" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#a0c4ff;strokeColor=#0066cc" vertex="1" parent="1">
+          <mxGeometry x="300" y="250" width="80" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="socket-api" value="Socket API" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#a0c4ff;strokeColor=#0066cc" vertex="1" parent="1">
+          <mxGeometry x="390" y="250" width="70" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="drivers" value="Network Drivers" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#a0c4ff;strokeColor=#0066cc" vertex="1" parent="1">
+          <mxGeometry x="300" y="280" width="100" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Device Services -->
+        <mxCell id="device-services" value="Device Services" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#b0e3e6;strokeColor=#0e8088" vertex="1" parent="1">
+          <mxGeometry x="500" y="230" width="180" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="console-drv" value="Console" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#a0c4ff;strokeColor=#0066cc" vertex="1" parent="1">
+          <mxGeometry x="510" y="250" width="60" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="keyboard-drv" value="Keyboard" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#a0c4ff;strokeColor=#0066cc" vertex="1" parent="1">
+          <mxGeometry x="580" y="250" width="60" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="storage-drv" value="Storage" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#a0c4ff;strokeColor=#0066cc" vertex="1" parent="1">
+          <mxGeometry x="650" y="250" width="60" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Security Services -->
+        <mxCell id="security-services" value="Security Services" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#b0e3e6;strokeColor=#0e8088" vertex="1" parent="1">
+          <mxGeometry x="710" y="230" width="180" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="auth-svc" value="Authentication" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#a0c4ff;strokeColor=#0066cc" vertex="1" parent="1">
+          <mxGeometry x="720" y="250" width="80" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="crypto-svc" value="Cryptography" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#a0c4ff;strokeColor=#0066cc" vertex="1" parent="1">
+          <mxGeometry x="810" y="250" width="70" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="audit-svc" value="Audit System" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#a0c4ff;strokeColor=#0066cc" vertex="1" parent="1">
+          <mxGeometry x="720" y="280" width="80" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Container Runtime (Future) -->
+        <mxCell id="container-runtime" value="Container Runtime" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#b0e3e6;strokeColor=#0e8088" vertex="1" parent="1">
+          <mxGeometry x="80" y="330" width="390" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="container-mgmt" value="Container Management" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#a0c4ff;strokeColor=#0066cc" vertex="1" parent="1">
+          <mxGeometry x="90" y="350" width="120" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="orchestration" value="Orchestration" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#a0c4ff;strokeColor=#0066cc" vertex="1" parent="1">
+          <mxGeometry x="220" y="350" width="100" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="resource-isolation" value="Resource Isolation" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#a0c4ff;strokeColor=#0066cc" vertex="1" parent="1">
+          <mxGeometry x="330" y="350" width="120" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- AI Engine (Future) -->
+        <mxCell id="ai-engine" value="AI Engine (Phase 2)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#b0e3e6;strokeColor=#0e8088" vertex="1" parent="1">
+          <mxGeometry x="500" y="330" width="390" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="ml-inference" value="ML Inference" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#a0c4ff;strokeColor=#0066cc" vertex="1" parent="1">
+          <mxGeometry x="510" y="350" width="80" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="neural-net" value="Neural Networks" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#a0c4ff;strokeColor=#0066cc" vertex="1" parent="1">
+          <mxGeometry x="600" y="350" width="90" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="ai-opt" value="AI Optimization" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#a0c4ff;strokeColor=#0066cc" vertex="1" parent="1">
+          <mxGeometry x="700" y="350" width="90" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Application Layer -->
+        <mxCell id="app-layer" value="Application Layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0f0f0;strokeColor=#666666;fontSize=16;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="50" y="50" width="1069" height="120" as="geometry" />
+        </mxCell>
+
+        <!-- Applications -->
+        <mxCell id="system-utils" value="System Utilities" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6" vertex="1" parent="1">
+          <mxGeometry x="80" y="80" width="120" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="user-apps" value="User Applications" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6" vertex="1" parent="1">
+          <mxGeometry x="220" y="80" width="120" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="cloud-services" value="Cloud Services" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6" vertex="1" parent="1">
+          <mxGeometry x="360" y="80" width="120" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="containers" value="Containers" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6" vertex="1" parent="1">
+          <mxGeometry x="500" y="80" width="120" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- Communication Arrows -->
+        <mxCell id="arrow1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeWidth=2;fillColor=#dae8fc;strokeColor=#6c8ebf" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="584" y="170" as="sourcePoint" />
+            <mxPoint x="584" y="200" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="arrow2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeWidth=2;fillColor=#fff2cc;strokeColor=#d6b656" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="584" y="420" as="sourcePoint" />
+            <mxPoint x="584" y="450" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="arrow3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeWidth=2;fillColor=#d5e8d4;strokeColor=#82b366" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="584" y="570" as="sourcePoint" />
+            <mxPoint x="584" y="600" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="arrow4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeWidth=2;fillColor=#f8cecc;strokeColor=#b85450" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="584" y="680" as="sourcePoint" />
+            <mxPoint x="584" y="700" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Legend -->
+        <mxCell id="legend" value="CloudOS Microkernel Architecture&#xa;&#xa;• Minimal kernel (&lt;50KB) with essential services&#xa;• User-space services for modularity and security&#xa;• Hardware abstraction for cross-platform support&#xa;• AI and container support in future phases" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12;align=left;verticalAlign=top" vertex="1" parent="1">
+          <mxGeometry x="920" y="80" width="180" height="120" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

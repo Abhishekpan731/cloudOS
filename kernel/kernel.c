@@ -2,6 +2,12 @@
 #include "kernel/types.h"
 #include "kernel/memory.h"
 #include "kernel/process.h"
+#include "kernel/device.h"
+#include "kernel/syscall.h"
+#include "kernel/hal.h"
+#include "kernel/fs.h"
+#include "kernel/net.h"
+#include "kernel/security.h"
 
 static uint16_t* const VGA_BUFFER = (uint16_t*)0xB8000;
 static const size_t VGA_WIDTH = 80;
@@ -95,6 +101,30 @@ void kernel_main(void) {
     kprintf("Process Manager: Starting...\n");
     process_init();
     kprintf("Process Manager: Ready\n");
+
+    // Initialize HAL
+    kprintf("Hardware Abstraction Layer: Initializing...\n");
+    hal_init();
+
+    // Initialize system calls
+    kprintf("System Calls: Initializing...\n");
+    syscall_init();
+
+    // Initialize device drivers
+    kprintf("Device Manager: Initializing...\n");
+    device_init();
+
+    // Initialize file system
+    kprintf("File System: Initializing...\n");
+    fs_init();
+
+    // Initialize network stack
+    kprintf("Network Stack: Initializing...\n");
+    net_init();
+
+    // Initialize security framework
+    kprintf("Security Framework: Initializing...\n");
+    security_init();
 
     kprintf("System Services: Loading...\n");
 

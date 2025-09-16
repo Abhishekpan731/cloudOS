@@ -1,0 +1,275 @@
+<mxfile host="app.diagrams.net" modified="2024-01-15T10:30:00.000Z" agent="CloudOS Design" etag="components-v1.0" version="22.1.16" type="device">
+  <diagram name="Component Interaction" id="component-interaction">
+    <mxGraphModel dx="1422" dy="794" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- Applications -->
+        <mxCell id="app1" value="User Application" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=14;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="80" y="50" width="150" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="app2" value="System Service" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=14;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="260" y="50" width="150" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="app3" value="Container Runtime" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=14;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="440" y="50" width="150" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- System Call Interface -->
+        <mxCell id="syscall-interface" value="System Call Interface" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=14;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="80" y="180" width="510" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- Microkernel Core -->
+        <mxCell id="microkernel-box" value="Microkernel Core" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=16;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="80" y="280" width="510" height="160" as="geometry" />
+        </mxCell>
+
+        <!-- Kernel Components -->
+        <mxCell id="process-mgr" value="Process&#xa;Manager" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffd966;strokeColor=#b8b000" vertex="1" parent="1">
+          <mxGeometry x="100" y="310" width="80" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="memory-mgr" value="Memory&#xa;Manager" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffd966;strokeColor=#b8b000" vertex="1" parent="1">
+          <mxGeometry x="200" y="310" width="80" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="ipc-mgr" value="IPC&#xa;Manager" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffd966;strokeColor=#b8b000" vertex="1" parent="1">
+          <mxGeometry x="300" y="310" width="80" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="security-mgr" value="Security&#xa;Manager" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffd966;strokeColor=#b8b000" vertex="1" parent="1">
+          <mxGeometry x="400" y="310" width="80" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="scheduler" value="Scheduler" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffd966;strokeColor=#b8b000" vertex="1" parent="1">
+          <mxGeometry x="500" y="310" width="80" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Device Drivers -->
+        <mxCell id="device-drivers" value="Device Drivers" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffd966;strokeColor=#b8b000" vertex="1" parent="1">
+          <mxGeometry x="100" y="390" width="480" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- User Space Services -->
+        <mxCell id="fs-service" value="File System&#xa;Service" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="80" y="520" width="120" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="net-service" value="Network&#xa;Service" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="220" y="520" width="120" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="security-service" value="Security&#xa;Service" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="360" y="520" width="120" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="device-service" value="Device&#xa;Service" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="500" y="520" width="120" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- Hardware Abstraction Layer -->
+        <mxCell id="hal-layer" value="Hardware Abstraction Layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="80" y="680" width="510" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- Hardware -->
+        <mxCell id="hardware" value="Physical Hardware" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=14;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="80" y="760" width="510" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- Communication Flows -->
+
+        <!-- App to System Calls -->
+        <mxCell id="flow1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;fillColor=#e1d5e7;strokeColor=#9673a6;startArrow=classic;startFill=1;endArrow=classic;endFill=1" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="155" y="110" as="sourcePoint" />
+            <mxPoint x="155" y="180" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="flow2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;fillColor=#e1d5e7;strokeColor=#9673a6;startArrow=classic;startFill=1;endArrow=classic;endFill=1" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="335" y="110" as="sourcePoint" />
+            <mxPoint x="335" y="180" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="flow3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;fillColor=#e1d5e7;strokeColor=#9673a6;startArrow=classic;startFill=1;endArrow=classic;endFill=1" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="515" y="110" as="sourcePoint" />
+            <mxPoint x="515" y="180" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- System Calls to Kernel -->
+        <mxCell id="flow4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;fillColor=#fff2cc;strokeColor=#d6b656;startArrow=classic;startFill=1;endArrow=classic;endFill=1" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="335" y="230" as="sourcePoint" />
+            <mxPoint x="335" y="280" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Kernel to HAL -->
+        <mxCell id="flow5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;fillColor=#fff2cc;strokeColor=#d6b656;startArrow=classic;startFill=1;endArrow=classic;endFill=1" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="335" y="440" as="sourcePoint" />
+            <mxPoint x="335" y="680" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- HAL to Hardware -->
+        <mxCell id="flow6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;fillColor=#d5e8d4;strokeColor=#82b366;startArrow=classic;startFill=1;endArrow=classic;endFill=1" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="335" y="730" as="sourcePoint" />
+            <mxPoint x="335" y="760" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- User Space Service Communications -->
+        <mxCell id="flow7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;fillColor=#dae8fc;strokeColor=#6c8ebf;startArrow=none;startFill=0;endArrow=classic;endFill=1" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="140" y="600" as="sourcePoint" />
+            <mxPoint x="140" y="680" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="flow8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;fillColor=#dae8fc;strokeColor=#6c8ebf;startArrow=none;startFill=0;endArrow=classic;endFill=1" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="280" y="600" as="sourcePoint" />
+            <mxPoint x="280" y="680" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="flow9" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;fillColor=#dae8fc;strokeColor=#6c8ebf;startArrow=none;startFill=0;endArrow=classic;endFill=1" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="420" y="600" as="sourcePoint" />
+            <mxPoint x="420" y="680" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="flow10" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;fillColor=#dae8fc;strokeColor=#6c8ebf;startArrow=none;startFill=0;endArrow=classic;endFill=1" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="560" y="600" as="sourcePoint" />
+            <mxPoint x="560" y="680" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- IPC Communication between Services -->
+        <mxCell id="ipc1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;fillColor=#dae8fc;strokeColor=#6c8ebf;startArrow=classic;startFill=1;endArrow=classic;endFill=1;dashed=1" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="200" y="560" as="sourcePoint" />
+            <mxPoint x="220" y="560" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="ipc2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;fillColor=#dae8fc;strokeColor=#6c8ebf;startArrow=classic;startFill=1;endArrow=classic;endFill=1;dashed=1" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="340" y="560" as="sourcePoint" />
+            <mxPoint x="360" y="560" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="ipc3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;fillColor=#dae8fc;strokeColor=#6c8ebf;startArrow=classic;startFill=1;endArrow=classic;endFill=1;dashed=1" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="480" y="560" as="sourcePoint" />
+            <mxPoint x="500" y="560" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- App to Service Communication -->
+        <mxCell id="app-svc1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;fillColor=#e1d5e7;strokeColor=#9673a6;startArrow=none;startFill=0;endArrow=classic;endFill=1;curved=1" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="155" y="110" as="sourcePoint" />
+            <mxPoint x="140" y="520" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="155" y="150" />
+              <mxPoint x="50" y="150" />
+              <mxPoint x="50" y="480" />
+              <mxPoint x="140" y="480" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="app-svc2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;fillColor=#e1d5e7;strokeColor=#9673a6;startArrow=none;startFill=0;endArrow=classic;endFill=1;curved=1" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="335" y="110" as="sourcePoint" />
+            <mxPoint x="280" y="520" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="335" y="150" />
+              <mxPoint x="650" y="150" />
+              <mxPoint x="650" y="480" />
+              <mxPoint x="280" y="480" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Legend and Annotations -->
+        <mxCell id="legend-box" value="Component Interaction Legend" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12;fontStyle=1;align=left;verticalAlign=top" vertex="1" parent="1">
+          <mxGeometry x="700" y="50" width="200" height="200" as="geometry" />
+        </mxCell>
+
+        <mxCell id="legend-syscall" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;fillColor=#fff2cc;strokeColor=#d6b656;startArrow=classic;startFill=1;endArrow=classic;endFill=1" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="720" y="80" as="sourcePoint" />
+            <mxPoint x="760" y="80" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="legend-syscall-text" value="System Calls" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10" vertex="1" parent="1">
+          <mxGeometry x="770" y="70" width="80" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="legend-ipc" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;fillColor=#dae8fc;strokeColor=#6c8ebf;startArrow=classic;startFill=1;endArrow=classic;endFill=1;dashed=1" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="720" y="110" as="sourcePoint" />
+            <mxPoint x="760" y="110" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="legend-ipc-text" value="IPC Communication" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10" vertex="1" parent="1">
+          <mxGeometry x="770" y="100" width="100" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="legend-direct" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;fillColor=#d5e8d4;strokeColor=#82b366;startArrow=classic;startFill=1;endArrow=classic;endFill=1" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="720" y="140" as="sourcePoint" />
+            <mxPoint x="760" y="140" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="legend-direct-text" value="Hardware Access" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10" vertex="1" parent="1">
+          <mxGeometry x="770" y="130" width="100" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="legend-app" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;fillColor=#e1d5e7;strokeColor=#9673a6;startArrow=none;startFill=0;endArrow=classic;endFill=1" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="720" y="170" as="sourcePoint" />
+            <mxPoint x="760" y="170" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="legend-app-text" value="Application Calls" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10" vertex="1" parent="1">
+          <mxGeometry x="770" y="160" width="100" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Communication Types Labels -->
+        <mxCell id="syscall-label" value="System Calls" style="text;html=1;strokeColor=none;fillColor=#fff2cc;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=10;fontStyle=2" vertex="1" parent="1">
+          <mxGeometry x="350" y="250" width="80" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="ipc-label" value="IPC Messages" style="text;html=1;strokeColor=none;fillColor=#dae8fc;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=10;fontStyle=2" vertex="1" parent="1">
+          <mxGeometry x="250" y="580" width="80" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="hal-label" value="Hardware Access" style="text;html=1;strokeColor=none;fillColor=#d5e8d4;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=10;fontStyle=2" vertex="1" parent="1">
+          <mxGeometry x="350" y="650" width="80" height="20" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

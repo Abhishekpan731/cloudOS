@@ -13,7 +13,7 @@ ifeq ($(UNAME_S),Darwin)
     CFLAGS = -target x86_64-unknown-none -fno-builtin -fno-stack-protector \
              -Wall -Wextra -Werror -c -Ikernel/include -std=c11 -ffreestanding \
              -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -nostdlib
-    LDFLAGS = -Wl,-T,kernel/arch/$(TARGET_ARCH)/linker.ld -nostdlib
+    LDFLAGS = -nostdlib -e _start -static
 else
     # Linux with native compilation
     CC = gcc

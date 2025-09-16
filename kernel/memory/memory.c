@@ -1,6 +1,8 @@
 #include "kernel/memory.h"
 #include "kernel/kernel.h"
 
+extern uint64_t* kernel_pml4;
+
 static uint8_t* heap_start;
 static uint8_t* heap_end;
 static uint8_t* heap_current;
@@ -25,6 +27,17 @@ void memory_init(void) {
     free_list->size = HEAP_SIZE - sizeof(alloc_header_t);
     free_list->free = true;
     free_list->next = NULL;
+
+    // Initialize virtual memory manager
+    kernel_pml4 = vmm_create_page_table();
+    if (kernel_pml4) {
+        // Set up initial kernel mappings
+        for (uint64_t addr = 0; addr < 0x1000000; addr += PAGE_SIZE) {
+            vmm_map_page(kernel_pml4, KERNEL_VIRTUAL_BASE + addr, addr,
+                        PTE_WRITE | PTE_GLOBAL);
+        }
+        vmm_switch_page_table(kernel_pml4);
+    }
 }
 
 void* kmalloc(size_t size) {
