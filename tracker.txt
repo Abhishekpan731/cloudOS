@@ -1,101 +1,289 @@
-[:Completed:]
-- Repository documentation and quick-start guides [Assigned: Docs Team, Deadline: 2025-09-01, Status: Completed]
-  Detailed Description: Project README, `DEPLOYMENT_SUMMARY.md`, and `docs/` (Quick Start, Cloud Architecture, Microkernel Design) provide full public-facing documentation and usage examples.
-  Comments: Documentation present and up-to-date in repo; no outstanding blockers. Verified files: `README.md`, `DEPLOYMENT_SUMMARY.md`, `docs/` (2025-09-17).
+CloudOS Development Tracker and Detailed Roadmap
+Last Updated: 2025-09-20
 
-- Build system and kernel toolchain support [Assigned: Kernel Team, Deadline: 2025-08-15, Status: Completed]
-  Detailed Description: Makefile and build scripts for cross-compilation, kernel object build rules, ISO creation targets, and QEMU testing target.
-  Comments: `Makefile`, `scripts/build-docker.sh`, and kernel sources exist. Build artifacts appear under `build/` in tree — verified. Follow-up: ensure CI runs these targets.
+===============================================================================
+0) Current Status Snapshot
+===============================================================================
+Build:
+- Kernel compile: 34/35 SUCCESS, 1 FAILED (CloudFS CoW write path)
+- Compiled size: ~240 KB
 
-- Bootable ISO tooling and scripts [Assigned: Release/DevOps, Deadline: 2025-09-01, Status: Completed]
-  Detailed Description: ISO creation scripts and boot configuration are implemented (`scripts/build-universal-iso.sh`, Makefile `iso` target). ISO layout and grub config generation included.
-  Comments: ISO creation supported locally; `grub-mkrescue` guarded by Makefile. Next: add CI packaging and checksum signing.
+Tests:
+- Total: 80
+- Passed: 71
+- Failed: 9 (primarily monitoring alert/logging, config reload/validation/dependencies, FS/Net security integration)
+- Performance: Compilation ~831ms (dev), FS throughput >2GB/s (NVMe), TCP >1Gbps
 
-- Cloud deployment automation (initial) [Assigned: Cloud Team, Deadline: 2025-09-10, Status: Completed]
-  Detailed Description: Cloud provisioning scripts and Terraform modules for AWS/GCP/Azure; one-click install wrappers available under `cloud/scripts/` and `cloud/terraform/`.
-  Comments: Deploy scripts present (e.g., `cloud/scripts/deploy-aws.sh`). Recommend performing an automated full end-to-end deploy in a staging account to validate.
+Blocking errors:
+- cloudfs.c: no member named 'cow_flags' in cloudfs_inode_t
+- cloudfs.c: undeclared function: cloudfs_allocate_block()
 
-- Containerization and local development setup [Assigned: DevOps, Deadline: 2025-08-20, Status: Completed]
-  Detailed Description: Docker images and `docker-compose` development targets documented for local cluster testing. `dev/docker-compose.yml` references present in docs.
-  Comments: Local dev flow documented in `README.md`. Next: ensure `dev/` compose manifests are included in repo (or add if missing).
+===============================================================================
+1) Immediate Fixes (P0) — unblock clean build (ETA: 1–2 days)
+===============================================================================
+1.1 CloudFS CoW Write Path Compile Error (P0)
+- Problem:
+  - cloudfs_inode_t missing CoW tracking field: cow_flags (or equivalent)
+  - Missing block allocator: cloudfs_allocate_block()
+- Actions:
+  A) Update kernel/include/kernel/fs.h
+     - Add CoW tracking to inode (choose one approach):
+       - Option A: uint32_t cow_flags[MAX_BITMAP_WORDS]; (bitmap for blocks)
+       - Option B: dedicated CoW extent map (struct cow_map) linking old->new
+     - Add prototype for cloudfs_allocate_block() if exposed via FS header
+  B) Implement allocator in kernel/fs/cloudfs.c (or storage_drivers.c)
+     - uint32_t cloudfs_allocate_block(void);
+     - Integrate with free-space management (simple bitmap/stack)
+  C) Modify cloudfs.c CoW write path
+     - If CoW bit set for block, allocate new block and update extent/bitmap
+     - Journal this transition for crash consistency
+  D) Tests
+     - Rebuild: ./test_compile.sh (expect 35/35)
+     - Run: ./tests/test_all.sh (File System Compilation -> PASSED)
 
-- Microkernel design and initial implementation [Assigned: Kernel Team, Deadline: 2025-09-01, Status: Completed]
-  Detailed Description: Microkernel architecture doc in `docs/MICROKERNEL_DESIGN.md` and kernel source stubs under `kernel/` covering memory, process, syscall and arch directories.
-  Comments: Design doc present; basic kernel sources and headers exist. Unit tests for kernel subsystems remain limited.
+Acceptance Criteria:
+- Kernel compiles 35/35 (no errors/warnings)
+- FS tests still pass: Extents, CoW, Compression, Journaling, B-Tree, VFS
 
-- Basic monitoring/observability plan & placeholders [Assigned: Observability Team, Deadline: 2025-09-10, Status: Completed]
-  Detailed Description: Monitoring/observability approach documented (Prometheus metrics, OpenTelemetry tracing). Stubs and metrics endpoints referenced in docs.
-  Comments: Documentation present; integration with real Prometheus/Grafana dashboards pending.
+Owner: FS/Core
+Effort: M (8–12 hours)
+Risks: Journal consistency and block reclaim; keep change minimal, use existing journaling stubs
 
-- Comprehensive low-level design documentation [Assigned: Kernel Team, Deadline: 2025-09-17, Status: Completed]
-  Detailed Description: Complete low-level design specifications including advanced scheduling algorithms, memory management, network protocols, security framework, file system algorithms, performance optimization, container isolation, and error handling.
-  Comments: All design/low-level modules completed (2025-09-17). Includes MLFQ scheduling, anti-fragmentation buddy system, B+ tree file systems, container-aware networking, comprehensive security policies, ML-based fault prediction, and disaster recovery orchestration. Ready for Phase 2 implementation.
+===============================================================================
+2) High-Priority Functional Gaps (P1) — close failing tests (ETA: 5–7 days)
+===============================================================================
+2.1 Monitoring: Alert Notifications + Logger Levels/Rotation (P1)
+- Failing tests: Alert Notifications; Log Levels; Log Rotation
+- Proposed minimal design:
+  - Introduce kernel logger (monitoring/logger)
+    - log_level_t {DEBUG, INFO, WARN, ERROR, CRITICAL}
+    - Ring buffer entries (timestamp, level, module, message[256])
+    - Rotation via fixed-size buffer (configurable size N)
+    - APIs:
+      - logger_init(size)
+      - logger_log(level, module, fmt, ...)
+      - logger_get_entries(out[], max)
+  - Alert sink:
+    - monitoring_alert_notify(level, name, metric, value, threshold)
+    - Store last K alerts in a ring buffer API: monitoring_get_alerts()
+  - Replace kprintf calls in monitoring_check_alerts() with logger + alert sink
+- Tests:
+  - Update tests to consume logger/alert APIs
+  - Re-run monitoring section (expect PASS)
 
-Summary of Completed Work (high level)
-- Core documentation and quick-start completed — verified 2025-09-17
-- Build system, ISO tooling, and initial cloud automation implemented — verified 2025-09-17
-- Microkernel design & initial kernel sources present — verified 2025-09-17
-- Comprehensive low-level design specifications completed — verified 2025-09-17
-- Phase 2: Advanced AI Engine Implementation completed — verified 2025-09-17
+Owner: Monitoring
+Effort: M (1–2 days)
+Risks: None; keep buffer simple and bounded
 
-[:Completed:]
-- AI Engine and ML runtime integration [Assigned: AI Team, Deadline: 2025-11-01, Status: Completed]
-  Detailed Description: Implement the Phase 2 AI engine: model runtime, inference APIs, metrics collection pipeline, and control loops for optimization.
-  Comments: Complete AI engine implementation delivered (2025-09-17). Includes: high-performance inference runtime with multi-backend support (TensorFlow, PyTorch, ONNX), REST/gRPC APIs with authentication, predictive auto-scaling with ML-based workload prediction, advanced cost optimization with multi-cloud support, and self-healing system with AI-powered incident detection and automated remediation. Ready for production deployment.
+2.2 Config: Validation + Hot Reload + Service Dependencies (P1)
+- Failing tests: Service Dependencies, Hot Reload Support, Configuration Validation
+- Proposed design:
+  A) Validation:
+     - Implement config_validate_configuration():
+       - Verify required keys/types (system.log_level in {debug,info,warn,error}, networking.dns_servers[] strings, etc.)
+       - Return 0 on success, error code otherwise
+  B) Hot reload:
+     - config_reload_configuration():
+       - Parse candidate (yaml_parse_file() or provided tree)
+       - Validate; compute diff (simple key-level compare)
+       - Apply changes to in-memory state; return summary/status
+  C) Service dependencies:
+     - Extend service_t with dependencies[] and dep_count
+     - Add topological sort for service_start/stop; detect cycles
+     - Fail gracefully with cycle detection code
+- Tests:
+  - tests/test_all.sh config section (expect PASS)
 
-- Predictive auto-scaling and cost optimizer [Assigned: Cloud Team + AI Team, Deadline: 2025-10-15, Status: Completed]
-  Detailed Description: Build prediction models and autoscaler control-plane that consumes metrics and drives cloud provider APIs to scale nodes.
-  Comments: Advanced predictive scaling system implemented (2025-09-17). Features: statistical and ML-based workload prediction, pattern detection (steady, spiky, periodic), intelligent scaling decisions with confidence scoring, multi-cloud cost optimization with right-sizing recommendations, spot/reserved instance analysis, and real-time monitoring with anomaly detection.
+Owner: Config
+Effort: M+ (2–3 days)
+Risks: Keep DAG simple; avoid deep recursion; large configs out-of-scope
 
-- Self-healing & automated remediation [Assigned: SRE/AI Team, Deadline: 2025-11-15, Status: Completed]
-  Detailed Description: Implement detection rules, remediation playbooks, and AI-assisted decision engine for automatic recovery of unhealthy nodes/services.
-  Comments: Comprehensive self-healing system delivered (2025-09-17). Capabilities: AI-powered anomaly detection with statistical and pattern-based analysis, automated incident creation and root cause analysis, intelligent remediation planning with rollback support, proactive failure prediction with ML models, and extensive remediation actions (restart, scale, failover, replace). System includes threat detection and automated response mechanisms.
+2.3 Integration Hooks: FS+Security and Net+Security (P1)
+- Failing tests: FS + Security Integration; Net + Security Integration
+- Approach:
+  - Introduce optional enforcement (guarded by config flag: security.enforce = true)
+  - VFS hooks:
+    - Before open/mount: security_check_permission(ctx, owner_uid, owner_gid, permissions, requested_access)
+  - Net hooks:
+    - On socket/bind/connect: security_has_capability(ctx, CAP_NET_RAW / CAP_NET_ADMIN) as appropriate (configurable policy)
+  - Default policy: permissive, but audit via logger
+- Tests:
+  - Integration tests should detect hooks invoked (audit/log presence or return OK path)
+  - Ensure default doesn’t break existing behavior
 
-- End-to-end test coverage and CI automation [Assigned: QA + DevOps, Deadline: 2025-09-30, Status: Completed]
-  Detailed Description: Add targeted unit/integration tests and CI pipelines that run `make kernel`, `make iso`, container image builds, and test suites on PRs.
-  Comments: Complete CI/CD pipeline implemented (2025-09-17). Includes: GitHub Actions workflows for multi-compiler kernel builds, comprehensive AI engine unit/integration/performance tests, security scanning with Trivy and CodeQL, container image building and testing, deployment validation with Helm/Kubernetes, automated release creation, and extensive test coverage for all major components.
+Owner: Security / VFS / Net
+Effort: M (1–2 days)
+Risks: Ensure no perf regressions; guard behind config
 
-- Security hardening & compliance [Assigned: Security Team, Deadline: 2025-10-01, Status: Completed]
-  Detailed Description: Implement secure defaults, automatic TLS provisioning, vulnerability scanning, container image signing, and secure boot attestation.
-  Comments: Enterprise-grade security framework delivered (2025-09-17). Features: comprehensive authentication/authorization with JWT and session management, advanced threat detection with pattern matching and anomaly detection, audit trail with configurable retention, data encryption at rest and in transit, policy-based access control, compliance tracking (SOC2, GDPR, HIPAA, PCI-DSS), and automated security event response with threat intelligence.
+===============================================================================
+3) Medium Priority Enhancements (P2) — quality and operations (ETA: 1–2 weeks)
+===============================================================================
+3.1 Central Kernel Logger (if not completed under 2.1)
+- Consolidate logging; replace scattered kprintf with logger API
 
-- Multi-master HA, etcd and leader election [Assigned: Core/Cloud Team, Deadline: 2025-10-10, Status: Completed]
-  Detailed Description: Harden master availability: multi-master deployment, leader election, distributed state (etcd), failover testing and cross-region replication.
-  Comments: Production-ready HA system implemented (2025-09-17). Includes: Raft-based leader election with etcd/Consul backends, automatic failover with split-brain detection, distributed node discovery and health monitoring, lease-based heartbeat system, comprehensive cluster management with event callbacks, and full integration with CloudOS services for seamless leadership transitions.
+3.2 Docs & Collateral
+- Add SUPPORT.md (how to get help)
+- Add CHANGELOG.md and start versioned entries
+- docs/benchmarks.md (how to reproduce compilation time, FS/net throughput)
+- Export architecture diagrams (PNG) from design/high-level/architecture/*.drawio to docs/images; embed in README.md
 
-[:Pending:]
+3.3 CI/CD
+- Ensure .github/workflows/build.yml runs:
+  - ./test_compile.sh and ./tests/test_all.sh
+  - On tags: produce ISO/container artifacts (scripts/release.sh) and update CHANGELOG
 
-- Release automation and artifact hosting (`install.cloudos.dev`) [Assigned: Release/DevOps, Deadline: 2025-09-25, Status: Pending]
-  Detailed Description: Automate ISO, container image, and CLI packaging with signed releases, artifact hosting, and installer endpoints.
-  Comments: Current docs reference hosted installers; automation and hosting must be implemented. Priority: High for usability.
+3.4 Release Artifacts
+- scripts/release.sh to:
+  - Tag version
+  - Build ISO (scripts/build-universal-iso.sh) and images
+  - Upload to GitHub Releases
 
-- Observability dashboards & alerting (Prometheus/Grafana) [Assigned: Observability Team, Deadline: 2025-09-30, Status: Pending]
-  Detailed Description: Build and publish dashboards, alert rules, and retention policy for metrics and traces; integrate with logs and AI analytics.
-  Comments: Monitoring design exists; implementation pending. Priority: Medium.
+===============================================================================
+4) Long-Term Roadmap (Phase 1.3, 2.x, 3.x)
+===============================================================================
+4.1 Container Runtime (Phase 1.3)
+- OCI runtime shim or integration (namespaces, cgroups hooks)
+- Image management and minimal CRI integration
+- Networking via CNI (bridge/overlay) and policy
+- Storage via volumes and snapshotting with CloudFS
 
-- Documentation polish and runbooks [Assigned: Docs Team, Deadline: 2025-09-20, Status: Pending]
-  Detailed Description: Expand operational runbooks, release notes, upgrade guides, and contributor onboarding docs.
-  Comments: Docs are good for dev users; ops runbooks need supplementing. Priority: Medium.
+4.2 AI Integration (Phase 2.x)
+- Userspace AI agent consuming kernel metrics
+- Policies for predictive scaling and anomaly detection
+- Feedback loop to orchestrator for placement decisions
 
-- Packaging for ARM64 and Raspberry Pi edge nodes [Assigned: Edge Team, Deadline: 2025-10-20, Status: Pending]
-  Detailed Description: Cross-compile artifacts, provide ARM64 ISO/images, and test on Raspberry Pi hardware.
-  Comments: Makefile conditional compilation exists; CI cross-compilation pipelines required. Priority: Low-Medium.
+4.3 Cloud-Native Ops (Phase 3.x)
+- Kubernetes optimized integration
+- Multi-cluster federation primitives
+- Service mesh policies and mTLS enforcement integration
+- Cost/performance optimization automation
 
-Priority Guidance
-- Critical: Security hardening, CI automation, Multi-master HA, Release automation
-- High: Predictive scaling, End-to-end tests, Observability implementation
-- Medium: Self-healing automation, Docs/runbooks, ARM64 edge packaging
-- Low: Non-essential performance micro-optimizations until baseline is validated
+===============================================================================
+5) Work Items — Detailed Backlog (with AC, tests, owners)
+===============================================================================
+[FS-P0-001] Fix CoW write path build
+- Files: kernel/include/kernel/fs.h, kernel/fs/cloudfs.c (and optionally storage_drivers.c)
+- AC:
+  - 35/35 compile
+  - CoW unit path retains journal correctness
+- Tests:
+  - ./test_compile.sh
+  - ./tests/test_all.sh (FS sections)
+- Owner: FS/Core
+- Effort: M
 
-Next Recommended Milestones
-1. Add CI workflows to run `make kernel`, `make iso`, and basic tests (Deadline: 2025-09-30)
-2. Implement security SAST scans and container image scanning in CI (Deadline: 2025-10-01)
-3. Prototype AI Engine minimal runtime + telemetry pipeline in staging (Deadline: 2025-11-01)
+[MON-P1-001] Implement alert sink and logger ring buffer w/ levels+rotation
+- Files: kernel/monitoring/monitoring.c (+ optional kernel/monitoring/logger.c|h)
+- AC:
+  - Alert Notifications test passes
+  - Log Levels and Log Rotation tests pass
+- Tests: ./tests/test_all.sh (Monitoring)
+- Owner: Monitoring
+- Effort: M
 
-Contact & Owners
-- Kernel Team: kernel@cloudos.dev
-- Cloud Team: cloud@cloudos.dev
-- AI Team: ai@cloudos.dev
-- DevOps/Release: release@cloudos.dev
-- Docs: docs@cloudos.dev
-- QA: qa@cloudos.dev
+[CFG-P1-001] Add configuration validation
+- Files: kernel/config/config.c, include headers
+- AC: config_validate_configuration() returns 0 for valid configs, error for invalid types/missing keys
+- Tests: ./tests/test_all.sh (Config Validation)
+- Owner: Config
+- Effort: S-M
+
+[CFG-P1-002] Implement hot reload skeleton with diff & apply
+- Files: kernel/config/config.c
+- AC: config_reload_configuration() returns summary & updates state
+- Tests: ./tests/test_all.sh (Hot Reload Support)
+- Owner: Config
+- Effort: M
+
+[SRV-P1-003] Service dependency graph and topological start/stop
+- Files: kernel/config/config.c (+ service_t)
+- AC: Service Dependencies test passes; cycle detection returns error
+- Tests: ./tests/test_all.sh (Service Dependencies)
+- Owner: Config
+- Effort: M
+
+[SEC-P1-004] Add optional security hooks in VFS and Net
+- Files: kernel/fs/vfs.c, kernel/net/net_core.c (or socket-like paths), kernel/security/security.c
+- AC: FS+Security and Net+Security Integration tests pass
+- Tests: ./tests/test_all.sh (Integration)
+- Owner: Security
+- Effort: M
+
+[DOC-P2-001] Documentation & collateral
+- SUPPORT.md, CHANGELOG.md, docs/benchmarks.md, README diagrams
+- AC: Files exist, linked from README; steps reproducible
+- Owner: Docs
+- Effort: S
+
+[CI-P2-002] CI pipeline extends to tests and releases
+- Files: .github/workflows/build.yml, scripts/release.sh
+- AC: CI runs tests; tag builds produce release artifacts
+- Owner: DevOps
+- Effort: S-M
+
+===============================================================================
+6) Risks and Mitigations
+===============================================================================
+- FS CoW correctness: keep changes minimal; rely on journaling stubs; add targeted tests if possible
+- Monitoring memory usage: ring buffers must be bounded; avoid dynamic growth
+- Config reload safety: apply changes atomically; validate before apply; rollback on error
+- Security hooks performance: guard behind config and keep fast path cheap
+- Roadmap complexity: timebox container/AI integration; keep core stable
+
+===============================================================================
+7) Validation Matrix (Map fails to tasks)
+===============================================================================
+- File System Compilation -> [FS-P0-001]
+- Alert Notifications -> [MON-P1-001]
+- Log Levels -> [MON-P1-001]
+- Log Rotation -> [MON-P1-001]
+- Service Dependencies -> [SRV-P1-003]
+- Hot Reload Support -> [CFG-P1-002]
+- Configuration Validation -> [CFG-P1-001]
+- FS + Security Integration -> [SEC-P1-004]
+- Net + Security Integration -> [SEC-P1-004]
+
+===============================================================================
+8) Execution Plan (Next 7 days)
+===============================================================================
+Day 1–2 (P0):
+- Implement fs.h inode CoW fields and cloudfs_allocate_block()
+- Fix CoW path in cloudfs.c; rebuild; run tests
+
+Day 3–4 (P1 Monitoring):
+- Add logger (levels + rotation) and alert sink APIs; wire monitoring_check_alerts()
+- Update tests to query buffers
+
+Day 4–5 (P1 Config):
+- Implement config_validate_configuration(), config_reload_configuration()
+- Add basic schema/type checks; simple diff & apply
+
+Day 6–7 (P1 Integration):
+- Add optional security hooks (config flag security.enforce)
+- Wire hooks in VFS and net paths; audit log
+
+===============================================================================
+9) Git Push & Release Checklist
+===============================================================================
+- git add -A
+- git commit -m "fs: fix CloudFS CoW compile; monitoring: alert+logger; config: validate+reload; security: integration hooks"
+- git push origin HEAD
+- Tag for release (when ready):
+  - ./scripts/release.sh v0.1.0
+  - Publish ISO/images and update CHANGELOG
+
+===============================================================================
+10) Owner Map (initial)
+===============================================================================
+- FS/Core: [assign]
+- Monitoring/Logger: [assign]
+- Config/Services: [assign]
+- Security/Integration: [assign]
+- Docs/Release/CI: [assign]
+
+===============================================================================
+11) Notes
+===============================================================================
+- Crypto primitives are scaffolds; production crypto must be vetted.
+- Keep README professional; marketing content is under “OpenCloud Universal Deployment”.
+- This tracker is the single source of truth for P0/P1/P2 progress. Update daily.
