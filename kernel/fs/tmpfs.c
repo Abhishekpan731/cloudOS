@@ -89,6 +89,7 @@ filesystem_t* tmpfs_create(size_t max_size) {
 }
 
 static int tmpfs_mount(filesystem_t* fs, const char* device, const char* mountpoint) {
+    (void)fs;
     (void)device;
     (void)mountpoint;
     return 0;
@@ -109,6 +110,7 @@ static vfs_node_t* tmpfs_create_node(filesystem_t* fs, const char* name, vfs_nod
     if (!fs || !fs->private_data) return NULL;
 
     tmpfs_data_t* data = (tmpfs_data_t*)fs->private_data;
+    (void)data; // TODO: Use data for proper tmpfs management
 
     vfs_node_t* node = (vfs_node_t*)kmalloc(sizeof(vfs_node_t));
     if (!node) return NULL;

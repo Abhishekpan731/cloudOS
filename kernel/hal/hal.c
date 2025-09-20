@@ -1,5 +1,6 @@
 #include "kernel/hal.h"
 #include "kernel/kernel.h"
+#include "kernel/time.h"
 
 static arch_info_t arch_info;
 static memory_region_t memory_map[16];
@@ -11,7 +12,7 @@ void hal_init(void) {
     hal_cpu_init();
     hal_interrupt_init();
     hal_memory_init();
-    hal_timer_init(1000); // 1kHz timer
+    hal_timer_init_freq(1000); // 1kHz timer
 
     kprintf("HAL: Initialization complete\n");
 }
@@ -45,7 +46,7 @@ void hal_interrupt_init(void) {
     // x86_64 interrupt initialization is done in x86_64_setup_idt()
 }
 
-void hal_timer_init(uint32_t frequency) {
+void hal_timer_init_freq(uint32_t frequency) {
     // Setup PIT timer
     uint32_t divisor = 1193180 / frequency;
     hal_outb(0x43, 0x36); // Command: channel 0, access mode lobyte/hibyte, mode 3
@@ -161,7 +162,7 @@ void hal_interrupt_init(void) {
     // ARM64 interrupt initialization is done in aarch64_setup_interrupts()
 }
 
-void hal_timer_init(uint32_t frequency) {
+void hal_timer_init_freq(uint32_t frequency) {
     // ARM generic timer setup is done in aarch64_setup_timer()
     (void)frequency;
 }
@@ -229,5 +230,172 @@ void hal_unmap_physical(void* virt_addr, size_t size) {
     (void)virt_addr;
     (void)size;
 }
+
+// Common time-related HAL functions
+static uint64_t boot_timestamp_ns = 0;
+static uint64_t timer_frequency_hz = 1000;
+
+uint64_t hal_get_timestamp_ns(void) {
+#ifdef __x86_64__
+    // Use TSC (Time Stamp Counter) for high-resolution timing
+    uint32_t lo, hi;
+    __asm__ volatile ("rdtsc" : "=a"(lo), "=d"(hi));
+    uint64_t tsc = ((uint64_t)hi << 32) | lo;
+
+    // Convert TSC to nanoseconds
+    // This is approximate - real implementation should calibrate TSC frequency
+    return tsc / 3; // Assume ~3GHz CPU for now
+#elif defined(__aarch64__)
+    // Use ARM Generic Timer
+    uint64_t freq = aarch64_read_cntfrq_el0();
+    uint64_t count = aarch64_read_cntvct_el0();
+
+    // Convert to nanoseconds
+    return (count * 1000000000ULL) / freq;
+#else
+    // Fallback to millisecond precision
+    return get_system_time_ms() * 1000000ULL;
+#endif
+}
+
+uint64_t hal_get_cpu_cycles(void) {
+#ifdef __x86_64__
+    uint32_t lo, hi;
+    __asm__ volatile ("rdtsc" : "=a"(lo), "=d"(hi));
+    return ((uint64_t)hi << 32) | lo;
+#elif defined(__aarch64__)
+    return aarch64_read_cntvct_el0();
+#else
+    return 0;
+#endif
+}
+
+uint64_t hal_get_cpu_frequency(void) {
+#ifdef __x86_64__
+    // For x86_64, we would typically calibrate this at boot
+    // For now, return a reasonable default
+    return 3000000000ULL; // 3 GHz
+#elif defined(__aarch64__)
+    return aarch64_read_cntfrq_el0();
+#else
+    return 1000000000ULL; // 1 GHz default
+#endif
+}
+
+void hal_timer_init(void) {
+    timer_frequency_hz = 1000; // 1kHz default
+    boot_timestamp_ns = hal_get_timestamp_ns();
+
+#ifdef __x86_64__
+    // Initialize PIT or HPET timer
+    hal_timer_init_x86();
+#elif defined(__aarch64__)
+    // ARM Generic Timer is usually initialized by firmware
+    // We might need to configure the timer interrupt here
+#endif
+}
+
+void hal_timer_set_frequency(uint32_t hz) {
+    timer_frequency_hz = hz;
+
+#ifdef __x86_64__
+    // Reprogram PIT timer
+    uint32_t divisor = 1193180 / hz;
+    hal_outb(0x43, 0x36); // Command byte
+    hal_outb(0x40, divisor & 0xFF); // Low byte
+    hal_outb(0x40, (divisor >> 8) & 0xFF); // High byte
+#elif defined(__aarch64__)
+    // ARM Generic Timer frequency is usually fixed
+    // We would configure the timer interrupt interval here
+#endif
+}
+
+// Timer interrupt handler (should be called from architecture-specific interrupt handler)
+void hal_timer_interrupt_handler(void) {
+    timer_tick(); // Call the time subsystem
+}
+
+#ifdef __x86_64__
+// x86-64 specific timer functions
+void hal_timer_init_x86(void) {
+    // Initialize PIT (Programmable Interval Timer)
+    hal_timer_set_frequency(timer_frequency_hz);
+}
+
+// Read Real-Time Clock (CMOS)
+uint8_t hal_rtc_read(uint8_t reg) {
+    hal_outb(0x70, reg);
+    return hal_inb(0x71);
+}
+
+void hal_rtc_write(uint8_t reg, uint8_t value) {
+    hal_outb(0x70, reg);
+    hal_outb(0x71, value);
+}
+
+bool rtc_available(void) {
+    return true; // x86 systems typically have RTC
+}
+
+void rtc_read_time(datetime_t* dt) {
+    if (!dt) return;
+
+    // Read from CMOS RTC
+    dt->second = hal_rtc_read(0x00);
+    dt->minute = hal_rtc_read(0x02);
+    dt->hour = hal_rtc_read(0x04);
+    dt->day = hal_rtc_read(0x07);
+    dt->month = hal_rtc_read(0x08);
+    dt->year = hal_rtc_read(0x09) + 2000; // Assuming 21st century
+    dt->nanosecond = 0;
+
+    // Convert from BCD if necessary
+    uint8_t status_b = hal_rtc_read(0x0B);
+    if (!(status_b & 0x04)) {
+        // BCD mode
+        dt->second = (dt->second & 0x0F) + ((dt->second / 16) * 10);
+        dt->minute = (dt->minute & 0x0F) + ((dt->minute / 16) * 10);
+        dt->hour = (dt->hour & 0x0F) + ((dt->hour / 16) * 10);
+        dt->day = (dt->day & 0x0F) + ((dt->day / 16) * 10);
+        dt->month = (dt->month & 0x0F) + ((dt->month / 16) * 10);
+        dt->year = (dt->year & 0x0F) + ((dt->year / 16) * 10) + 2000;
+    }
+}
+
+void rtc_set_time(const datetime_t* dt) {
+    if (!dt) return;
+
+    // Convert to BCD if necessary
+    uint8_t status_b = hal_rtc_read(0x0B);
+    uint8_t second = dt->second;
+    uint8_t minute = dt->minute;
+    uint8_t hour = dt->hour;
+    uint8_t day = dt->day;
+    uint8_t month = dt->month;
+    uint8_t year = dt->year - 2000;
+
+    if (!(status_b & 0x04)) {
+        // Convert to BCD
+        second = (second % 10) + ((second / 10) * 16);
+        minute = (minute % 10) + ((minute / 10) * 16);
+        hour = (hour % 10) + ((hour / 10) * 16);
+        day = (day % 10) + ((day / 10) * 16);
+        month = (month % 10) + ((month / 10) * 16);
+        year = (year % 10) + ((year / 10) * 16);
+    }
+
+    // Wait for update flag to clear
+    while (hal_rtc_read(0x0A) & 0x80);
+
+    // Write to CMOS RTC
+    hal_rtc_write(0x00, second);
+    hal_rtc_write(0x02, minute);
+    hal_rtc_write(0x04, hour);
+    hal_rtc_write(0x07, day);
+    hal_rtc_write(0x08, month);
+    hal_rtc_write(0x09, year);
+}
+
+#endif
 
 #endif

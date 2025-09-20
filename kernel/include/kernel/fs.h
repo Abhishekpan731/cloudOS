@@ -73,6 +73,16 @@ typedef struct mount_point {
     struct mount_point* next;
 } mount_point_t;
 
+// VFS operations structure
+typedef uint32_t mode_t;
+typedef struct {
+    int (*open)(const char *path, int flags, mode_t mode);
+    int (*close)(int fd);
+    ssize_t (*read)(int fd, void *buf, size_t count);
+    ssize_t (*write)(int fd, const void *buf, size_t count);
+    int (*stat)(const char *path, struct stat *st);
+} vfs_operations_t;
+
 void fs_init(void);
 int fs_register(filesystem_t* fs);
 int fs_mount(const char* device, const char* mountpoint, const char* fstype);
@@ -86,6 +96,7 @@ ssize_t vfs_write(int fd, const void* buffer, size_t size);
 int vfs_create(const char* path, vfs_node_type_t type, uint32_t permissions);
 int vfs_delete(const char* path);
 int vfs_mkdir(const char* path, uint32_t permissions);
+int vfs_register_filesystem(const char* name, vfs_operations_t* ops);
 
 // CloudFS specific
 int cloudfs_init(void);

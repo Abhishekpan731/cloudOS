@@ -1,0 +1,190 @@
+version: '3.8'
+
+services:
+  # Prometheus - Metrics collection and storage
+  prometheus:
+    image: prom/prometheus:v2.47.0
+    container_name: cloudos-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus/alerts:/etc/prometheus/alerts
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=15d'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    restart: unless-stopped
+    networks:
+      - cloudos-observability
+
+  # Grafana - Visualization and dashboards
+  grafana:
+    image: grafana/grafana:10.1.0
+    container_name: cloudos-grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=cloudos123
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_DOMAIN=localhost
+      - GF_SMTP_ENABLED=false
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel,grafana-clock-panel,grafana-simple-json-datasource
+    restart: unless-stopped
+    networks:
+      - cloudos-observability
+    depends_on:
+      - prometheus
+
+  # AlertManager - Alert routing and notification
+  alertmanager:
+    image: prom/alertmanager:v0.26.0
+    container_name: cloudos-alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+      - alertmanager_data:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+      - '--web.external-url=http://localhost:9093'
+    restart: unless-stopped
+    networks:
+      - cloudos-observability
+
+  # Pushgateway - For pushing metrics from batch jobs
+  pushgateway:
+    image: prom/pushgateway:v1.6.2
+    container_name: cloudos-pushgateway
+    ports:
+      - "9091:9091"
+    restart: unless-stopped
+    networks:
+      - cloudos-observability
+
+  # Node Exporter - Host system metrics
+  node-exporter:
+    image: prom/node-exporter:v1.6.1
+    container_name: cloudos-node-exporter
+    ports:
+      - "9100:9100"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    restart: unless-stopped
+    networks:
+      - cloudos-observability
+
+  # cAdvisor - Container metrics
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.47.2
+    container_name: cloudos-cadvisor
+    ports:
+      - "8080:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    privileged: true
+    devices:
+      - /dev/kmsg
+    restart: unless-stopped
+    networks:
+      - cloudos-observability
+
+  # Jaeger - Distributed tracing (All-in-one for development)
+  jaeger:
+    image: jaegertracing/all-in-one:1.49
+    container_name: cloudos-jaeger
+    ports:
+      - "16686:16686"  # Jaeger UI
+      - "14268:14268"  # HTTP collector
+      - "14250:14250"  # gRPC collector
+      - "6831:6831/udp"  # UDP collector
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    restart: unless-stopped
+    networks:
+      - cloudos-observability
+
+  # Loki - Log aggregation
+  loki:
+    image: grafana/loki:2.9.0
+    container_name: cloudos-loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./loki/loki.yml:/etc/loki/local-config.yaml
+      - loki_data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    restart: unless-stopped
+    networks:
+      - cloudos-observability
+
+  # Promtail - Log collection agent
+  promtail:
+    image: grafana/promtail:2.9.0
+    container_name: cloudos-promtail
+    volumes:
+      - ./promtail/promtail.yml:/etc/promtail/config.yml
+      - /var/log:/var/log:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    command: -config.file=/etc/promtail/config.yml
+    restart: unless-stopped
+    networks:
+      - cloudos-observability
+    depends_on:
+      - loki
+
+  # CloudOS Metrics Exporter - Custom metrics from CloudOS
+  cloudos-exporter:
+    build:
+      context: .
+      dockerfile: Dockerfile.exporter
+    container_name: cloudos-metrics-exporter
+    ports:
+      - "9200:9200"
+    environment:
+      - CLOUDOS_METRICS_PORT=9200
+      - CLOUDOS_JOB_NAME=cloudos-exporter
+      - CLOUDOS_PUSHGATEWAY_URL=http://pushgateway:9091
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./config:/config
+    restart: unless-stopped
+    networks:
+      - cloudos-observability
+    depends_on:
+      - prometheus
+      - pushgateway
+
+volumes:
+  prometheus_data:
+  grafana_data:
+  alertmanager_data:
+  loki_data:
+
+networks:
+  cloudos-observability:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

@@ -1,6 +1,7 @@
 #include "kernel/process.h"
 #include "kernel/memory.h"
 #include "kernel/kernel.h"
+#include "kernel/time.h"
 
 process_t* process_list = NULL;
 static process_t* current_process = NULL;
@@ -103,7 +104,7 @@ void process_schedule(void) {
     process_t* highest_priority = NULL;
     process_t* current = process_list;
     uint8_t max_priority = 0;
-    uint64_t current_time = 0; // TODO: Get actual system time
+    uint64_t current_time = get_system_time_ms();
 
     // Update current process time slice
     if (current_process && current_process->state == PROCESS_RUNNING) {
@@ -205,7 +206,7 @@ void process_update_cpu_time(process_t* proc, uint64_t time_delta) {
 
 void process_aging(void) {
     process_t* current = process_list;
-    uint64_t current_time = 0; // TODO: Get actual system time
+    uint64_t current_time = get_system_time_ms();
 
     while (current) {
         if (current->state == PROCESS_READY) {

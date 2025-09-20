@@ -6,10 +6,9 @@ static uint16_t ip_id_counter = 1;
 
 uint32_t ip_route(uint32_t dest_ip) {
     // Simple routing - find interface on same network
-    net_interface_t* iface = NULL;
 
     // First try to find direct route (same network)
-    net_interface_t* current = NULL; // TODO: Get interface list
+    net_interface_t* current = NULL; // TODO: Get interface list head
     while (current) {
         if ((dest_ip & current->netmask) == (current->ip_addr & current->netmask)) {
             return dest_ip; // Direct route

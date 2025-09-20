@@ -1,351 +1,510 @@
+/*
+ * Virtual File System (VFS) Layer
+ * Provides unified interface for different file systems
+ */
+
 #include "kernel/fs.h"
-#include "kernel/kernel.h"
 #include "kernel/memory.h"
+#include "kernel/kernel.h"
+#include "kernel/types.h"
 
-static file_descriptor_t file_table[MAX_OPEN_FILES];
-static filesystem_t* filesystem_list = NULL;
-static mount_point_t* mount_points = NULL;
-static vfs_node_t* root_node = NULL;
-
-void fs_init(void) {
-    kprintf("File System: Initializing VFS...\n");
-
-    // Initialize file descriptor table
-    for (int i = 0; i < MAX_OPEN_FILES; i++) {
-        file_table[i].node = NULL;
-        file_table[i].offset = 0;
-        file_table[i].flags = 0;
-        file_table[i].ref_count = 0;
+// Simple memset implementation for kernel use
+static void *memset(void *s, int c, size_t n)
+{
+    unsigned char *p = (unsigned char *)s;
+    for (size_t i = 0; i < n; i++)
+    {
+        p[i] = (unsigned char)c;
     }
-
-    // Initialize file systems
-    cloudfs_init();
-    tmpfs_init();
-    devfs_init();
-
-    // Create root filesystem (tmpfs for now)
-    filesystem_t* rootfs = tmpfs_create(1024 * 1024); // 1MB tmpfs
-    if (rootfs) {
-        fs_mount(NULL, "/", "tmpfs");
-
-        // Create basic directory structure
-        vfs_mkdir("/dev", S_IRUSR | S_IWUSR | S_IXUSR);
-        vfs_mkdir("/tmp", S_IRUSR | S_IWUSR | S_IXUSR);
-        vfs_mkdir("/proc", S_IRUSR | S_IWUSR | S_IXUSR);
-    }
-
-    kprintf("File System: VFS Ready\n");
+    return s;
 }
 
-int fs_register(filesystem_t* fs) {
-    if (!fs) return -1;
+// Simple strcmp implementation for kernel use
+static int strcmp(const char *s1, const char *s2)
+{
+    while (*s1 && (*s1 == *s2))
+    {
+        s1++;
+        s2++;
+    }
+    return *(unsigned char *)s1 - *(unsigned char *)s2;
+}
 
-    fs->next = filesystem_list;
-    filesystem_list = fs;
+// Simple strcpy implementation for kernel use
+static char *strcpy(char *dest, const char *src)
+{
+    char *d = dest;
+    while ((*d++ = *src++) != '\0')
+        ;
+    return dest;
+}
 
-    kprintf("File System: Registered %s\n", fs->name);
+// Additional types needed for VFS
+typedef uint32_t mode_t;
+typedef uint32_t uid_t;
+typedef uint32_t gid_t;
+
+// File descriptor table
+#define MAX_FILE_DESCRIPTORS 1024
+static file_descriptor_t *file_descriptors[MAX_FILE_DESCRIPTORS];
+static uint32_t __attribute__((unused)) next_fd = 3; // 0, 1, 2 are reserved for stdin, stdout, stderr
+
+// Registered filesystems
+static filesystem_t *registered_filesystems = NULL;
+
+// Mount points
+static mount_point_t *mount_points = NULL;
+
+// VFS operations mapping
+static vfs_operations_t *vfs_ops = NULL;
+
+// Initialize VFS
+void fs_init(void)
+{
+    kprintf("VFS: Initializing...\n");
+
+    // Clear file descriptor table
+    memset(file_descriptors, 0, sizeof(file_descriptors));
+
+    // Initialize VFS operations
+    vfs_ops = (vfs_operations_t *)kmalloc(sizeof(vfs_operations_t));
+    if (!vfs_ops)
+    {
+        kernel_panic("VFS: Failed to allocate VFS operations");
+    }
+
+    // Initialize with default operations (will be overridden by filesystems)
+    vfs_ops->open = NULL;
+    vfs_ops->close = NULL;
+    vfs_ops->read = NULL;
+    vfs_ops->write = NULL;
+    vfs_ops->stat = NULL;
+
+    kprintf("VFS: Initialized\n");
+}
+
+// Register a filesystem
+int fs_register(filesystem_t *fs)
+{
+    if (!fs)
+        return -1;
+
+    // Add to registered filesystems list
+    fs->next = registered_filesystems;
+    registered_filesystems = fs;
+
+    kprintf("VFS: Registered filesystem '%s'\n", fs->name);
     return 0;
 }
 
-static filesystem_t* find_filesystem(const char* fstype) {
-    filesystem_t* current = filesystem_list;
+// Mount a filesystem
+int fs_mount(const char *device, const char *mountpoint, const char *fstype)
+{
+    if (!device || !mountpoint || !fstype)
+        return -1;
 
-    while (current) {
-        int match = 1;
-        for (int i = 0; fstype[i] || current->name[i]; i++) {
-            if (fstype[i] != current->name[i]) {
-                match = 0;
-                break;
-            }
+    // Find the filesystem type
+    filesystem_t *fs = registered_filesystems;
+    while (fs)
+    {
+        if (strcmp(fs->name, fstype) == 0)
+        {
+            break;
         }
-        if (match) return current;
-        current = current->next;
+        fs = fs->next;
     }
-    return NULL;
-}
 
-int fs_mount(const char* device, const char* mountpoint, const char* fstype) {
-    filesystem_t* fs = find_filesystem(fstype);
-    if (!fs) return -1;
-
-    mount_point_t* mp = (mount_point_t*)kmalloc(sizeof(mount_point_t));
-    if (!mp) return -1;
-
-    // Copy mountpoint path
-    int i;
-    for (i = 0; i < FS_PATH_MAX - 1 && mountpoint[i]; i++) {
-        mp->path[i] = mountpoint[i];
+    if (!fs)
+    {
+        kprintf("VFS: Unknown filesystem type '%s'\n", fstype);
+        return -1;
     }
-    mp->path[i] = '\0';
 
+    // Create mount point
+    mount_point_t *mp = (mount_point_t *)kmalloc(sizeof(mount_point_t));
+    if (!mp)
+    {
+        kprintf("VFS: Failed to allocate mount point\n");
+        return -1;
+    }
+
+    strcpy(mp->path, mountpoint);
     mp->fs = fs;
-    mp->node = fs->root;
-
-    if (fs->ops && fs->ops->mount) {
-        if (fs->ops->mount(fs, device, mountpoint) != 0) {
-            kfree(mp);
-            return -1;
-        }
-    }
-
+    mp->node = NULL; // Will be set by filesystem mount
     mp->next = mount_points;
     mount_points = mp;
 
-    // Set root node if mounting at /
-    if (mountpoint[0] == '/' && mountpoint[1] == '\0') {
-        root_node = fs->root;
+    // Call filesystem mount operation
+    if (fs->ops && fs->ops->mount)
+    {
+        int result = fs->ops->mount(fs, device, mountpoint);
+        if (result != 0)
+        {
+            kprintf("VFS: Filesystem mount failed\n");
+            kfree(mp);
+            return result;
+        }
     }
 
-    kprintf("File System: Mounted %s at %s\n", fstype, mountpoint);
+    // Update VFS operations to point to this filesystem
+    vfs_ops = (vfs_operations_t *)fs->private_data;
+
+    kprintf("VFS: Mounted %s on %s\n", fstype, mountpoint);
     return 0;
 }
 
-int fs_unmount(const char* mountpoint) {
-    mount_point_t** current = &mount_points;
+// Unmount a filesystem
+int fs_unmount(const char *mountpoint)
+{
+    if (!mountpoint)
+        return -1;
 
-    while (*current) {
-        int match = 1;
-        for (int i = 0; mountpoint[i] || (*current)->path[i]; i++) {
-            if (mountpoint[i] != (*current)->path[i]) {
-                match = 0;
-                break;
-            }
+    // Find mount point
+    mount_point_t *mp = mount_points;
+    mount_point_t *prev = NULL;
+
+    while (mp)
+    {
+        if (strcmp(mp->path, mountpoint) == 0)
+        {
+            break;
         }
-
-        if (match) {
-            mount_point_t* to_remove = *current;
-
-            if (to_remove->fs->ops && to_remove->fs->ops->unmount) {
-                to_remove->fs->ops->unmount(to_remove->fs);
-            }
-
-            *current = (*current)->next;
-            kfree(to_remove);
-
-            kprintf("File System: Unmounted %s\n", mountpoint);
-            return 0;
-        }
-        current = &(*current)->next;
+        prev = mp;
+        mp = mp->next;
     }
+
+    if (!mp)
+    {
+        kprintf("VFS: Mount point not found: %s\n", mountpoint);
+        return -1;
+    }
+
+    // Call filesystem unmount operation
+    if (mp->fs->ops && mp->fs->ops->unmount)
+    {
+        int result = mp->fs->ops->unmount(mp->fs);
+        if (result != 0)
+        {
+            kprintf("VFS: Filesystem unmount failed\n");
+            return result;
+        }
+    }
+
+    // Remove from mount points list
+    if (prev)
+    {
+        prev->next = mp->next;
+    }
+    else
+    {
+        mount_points = mp->next;
+    }
+
+    kfree(mp);
+    kprintf("VFS: Unmounted %s\n", mountpoint);
+    return 0;
+}
+
+// Lookup a path in the VFS
+vfs_node_t *vfs_lookup(const char *path)
+{
+    if (!path)
+        return NULL;
+
+    // For now, simple implementation - just return NULL
+    // TODO: Implement proper path resolution
+    (void)path;
+    return NULL;
+}
+
+// Open a file
+int vfs_open(const char *path, uint32_t flags)
+{
+    if (!path)
+        return -1;
+
+    // Find available file descriptor
+    int fd = -1;
+    for (int i = 0; i < MAX_FILE_DESCRIPTORS; i++)
+    {
+        if (!file_descriptors[i])
+        {
+            fd = i;
+            break;
+        }
+    }
+
+    if (fd == -1)
+    {
+        kprintf("VFS: No available file descriptors\n");
+        return -1;
+    }
+
+    // Call filesystem open operation
+    if (vfs_ops && vfs_ops->open)
+    {
+        int result = vfs_ops->open(path, flags, 0644); // Default permissions
+        if (result < 0)
+        {
+            return result;
+        }
+
+        // Create file descriptor
+        file_descriptors[fd] = (file_descriptor_t *)kmalloc(sizeof(file_descriptor_t));
+        if (!file_descriptors[fd])
+        {
+            kprintf("VFS: Failed to allocate file descriptor\n");
+            return -1;
+        }
+
+        // Initialize file descriptor
+        file_descriptors[fd]->node = NULL; // TODO: Set to actual node
+        file_descriptors[fd]->offset = 0;
+        file_descriptors[fd]->flags = flags;
+        file_descriptors[fd]->ref_count = 1;
+
+        return fd;
+    }
+
     return -1;
 }
 
-static vfs_node_t* resolve_path(const char* path) {
-    if (!path || !root_node) return NULL;
-
-    if (path[0] != '/') return NULL; // Relative paths not supported yet
-
-    vfs_node_t* current = root_node;
-    char component[FS_NAME_MAX + 1];
-    int path_idx = 1; // Skip initial '/'
-
-    while (path[path_idx] && current) {
-        // Extract next path component
-        int comp_idx = 0;
-        while (path[path_idx] && path[path_idx] != '/' && comp_idx < FS_NAME_MAX) {
-            component[comp_idx++] = path[path_idx++];
-        }
-        component[comp_idx] = '\0';
-
-        if (comp_idx == 0) break; // Empty component
-
-        // Skip '/' separator
-        if (path[path_idx] == '/') path_idx++;
-
-        // Find child with matching name
-        vfs_node_t* child = current->children;
-        while (child) {
-            int match = 1;
-            for (int i = 0; component[i] || child->name[i]; i++) {
-                if (component[i] != child->name[i]) {
-                    match = 0;
-                    break;
-                }
-            }
-            if (match) {
-                current = child;
-                break;
-            }
-            child = child->next_sibling;
-        }
-
-        if (!child) return NULL; // Path component not found
-    }
-
-    return current;
-}
-
-vfs_node_t* vfs_lookup(const char* path) {
-    return resolve_path(path);
-}
-
-int vfs_open(const char* path, uint32_t flags) {
-    vfs_node_t* node = resolve_path(path);
-
-    if (!node && (flags & O_CREAT)) {
-        // Create file if it doesn't exist and O_CREAT is set
-        if (vfs_create(path, VFS_FILE, S_IRUSR | S_IWUSR) == 0) {
-            node = resolve_path(path);
-        }
-    }
-
-    if (!node) return -1;
-
-    // Find free file descriptor
-    for (int i = 3; i < MAX_OPEN_FILES; i++) { // Reserve 0,1,2 for stdin,stdout,stderr
-        if (file_table[i].node == NULL) {
-            file_table[i].node = node;
-            file_table[i].flags = flags;
-            file_table[i].offset = (flags & O_APPEND) ? node->size : 0;
-            file_table[i].ref_count = 1;
-
-            if (flags & O_TRUNC) {
-                node->size = 0;
-            }
-
-            return i;
-        }
-    }
-
-    return -1; // No free file descriptors
-}
-
-int vfs_close(int fd) {
-    if (fd < 0 || fd >= MAX_OPEN_FILES || file_table[fd].node == NULL) {
+// Close a file
+int vfs_close(int fd)
+{
+    if (fd < 0 || fd >= MAX_FILE_DESCRIPTORS || !file_descriptors[fd])
+    {
         return -1;
     }
 
-    file_table[fd].ref_count--;
-    if (file_table[fd].ref_count == 0) {
-        file_table[fd].node = NULL;
-        file_table[fd].offset = 0;
-        file_table[fd].flags = 0;
+    // Decrease reference count
+    file_descriptors[fd]->ref_count--;
+
+    if (file_descriptors[fd]->ref_count == 0)
+    {
+        // Call filesystem close operation
+        if (vfs_ops && vfs_ops->close)
+        {
+            vfs_ops->close(fd);
+        }
+
+        // Free file descriptor
+        kfree(file_descriptors[fd]);
+        file_descriptors[fd] = NULL;
     }
 
     return 0;
 }
 
-ssize_t vfs_read(int fd, void* buffer, size_t size) {
-    if (fd < 0 || fd >= MAX_OPEN_FILES || file_table[fd].node == NULL) {
+// Read from a file
+ssize_t vfs_read(int fd, void *buffer, size_t size)
+{
+    if (fd < 0 || fd >= MAX_FILE_DESCRIPTORS || !file_descriptors[fd])
+    {
         return -1;
     }
 
-    file_descriptor_t* file = &file_table[fd];
-    vfs_node_t* node = file->node;
-
-    if (!node->fs || !node->fs->ops || !node->fs->ops->read) {
+    if (!buffer || size == 0)
+    {
         return -1;
     }
 
-    ssize_t bytes_read = node->fs->ops->read(node->fs, node, file->offset, buffer, size);
-    if (bytes_read > 0) {
-        file->offset += bytes_read;
-        node->access_time = 0; // TODO: Get actual timestamp
-    }
-
-    return bytes_read;
-}
-
-ssize_t vfs_write(int fd, const void* buffer, size_t size) {
-    if (fd < 0 || fd >= MAX_OPEN_FILES || file_table[fd].node == NULL) {
-        return -1;
-    }
-
-    file_descriptor_t* file = &file_table[fd];
-    vfs_node_t* node = file->node;
-
-    if (!(file->flags & (O_WRONLY | O_RDWR))) {
-        return -1; // Not opened for writing
-    }
-
-    if (!node->fs || !node->fs->ops || !node->fs->ops->write) {
-        return -1;
-    }
-
-    ssize_t bytes_written = node->fs->ops->write(node->fs, node, file->offset, buffer, size);
-    if (bytes_written > 0) {
-        file->offset += bytes_written;
-        if (file->offset > node->size) {
-            node->size = file->offset;
+    // Call filesystem read operation
+    if (vfs_ops && vfs_ops->read)
+    {
+        ssize_t result = vfs_ops->read(fd, buffer, size);
+        if (result > 0)
+        {
+            file_descriptors[fd]->offset += result;
         }
-        node->modify_time = 0; // TODO: Get actual timestamp
+        return result;
     }
 
-    return bytes_written;
+    return -1;
 }
 
-int vfs_create(const char* path, vfs_node_type_t type, uint32_t permissions) {
-    // Find parent directory
-    char parent_path[FS_PATH_MAX];
-    char filename[FS_NAME_MAX + 1];
-
-    // Extract parent path and filename
-    int last_slash = -1;
-    for (int i = 0; path[i]; i++) {
-        if (path[i] == '/') last_slash = i;
-    }
-
-    if (last_slash == -1) return -1;
-
-    // Copy parent path
-    for (int i = 0; i < last_slash && i < FS_PATH_MAX - 1; i++) {
-        parent_path[i] = path[i];
-    }
-    parent_path[last_slash == 0 ? 1 : last_slash] = '\0';
-    if (last_slash == 0) {
-        parent_path[0] = '/';
-        parent_path[1] = '\0';
-    }
-
-    // Copy filename
-    int j = 0;
-    for (int i = last_slash + 1; path[i] && j < FS_NAME_MAX; i++, j++) {
-        filename[j] = path[i];
-    }
-    filename[j] = '\0';
-
-    vfs_node_t* parent = resolve_path(parent_path);
-    if (!parent || parent->type != VFS_DIR) return -1;
-
-    if (!parent->fs || !parent->fs->ops || !parent->fs->ops->create_node) {
+// Write to a file
+ssize_t vfs_write(int fd, const void *buffer, size_t size)
+{
+    if (fd < 0 || fd >= MAX_FILE_DESCRIPTORS || !file_descriptors[fd])
+    {
         return -1;
     }
 
-    vfs_node_t* new_node = parent->fs->ops->create_node(parent->fs, filename, type);
-    if (!new_node) return -1;
-
-    new_node->permissions = permissions;
-    new_node->parent = parent;
-
-    // Add to parent's children list
-    new_node->next_sibling = parent->children;
-    parent->children = new_node;
-
-    return 0;
-}
-
-int vfs_delete(const char* path) {
-    vfs_node_t* node = resolve_path(path);
-    if (!node) return -1;
-
-    if (!node->fs || !node->fs->ops || !node->fs->ops->delete_node) {
+    if (!buffer || size == 0)
+    {
         return -1;
     }
 
-    // Remove from parent's children list
-    if (node->parent) {
-        vfs_node_t** current = &node->parent->children;
-        while (*current && *current != node) {
-            current = &(*current)->next_sibling;
+    // Call filesystem write operation
+    if (vfs_ops && vfs_ops->write)
+    {
+        ssize_t result = vfs_ops->write(fd, buffer, size);
+        if (result > 0)
+        {
+            file_descriptors[fd]->offset += result;
         }
-        if (*current) {
-            *current = node->next_sibling;
-        }
+        return result;
     }
 
-    return node->fs->ops->delete_node(node->fs, node);
+    return -1;
 }
 
-int vfs_mkdir(const char* path, uint32_t permissions) {
+// Get file status
+int vfs_stat(const char *path, struct stat *st)
+{
+    if (!path || !st)
+        return -1;
+
+    // Call filesystem stat operation
+    if (vfs_ops && vfs_ops->stat)
+    {
+        return vfs_ops->stat(path, st);
+    }
+
+    return -1;
+}
+
+// Create a file or directory
+int vfs_create(const char *path, vfs_node_type_t type, uint32_t permissions)
+{
+    (void)path;
+    (void)type;
+    (void)permissions;
+    // TODO: Implement file/directory creation
+    return -1;
+}
+
+// Delete a file or directory
+int vfs_delete(const char *path)
+{
+    (void)path;
+    // TODO: Implement file/directory deletion
+    return -1;
+}
+
+// Create a directory
+int vfs_mkdir(const char *path, uint32_t permissions)
+{
     return vfs_create(path, VFS_DIR, permissions);
+}
+
+// Register filesystem with VFS (compatibility function)
+int vfs_register_filesystem(const char *name, vfs_operations_t *ops)
+{
+    if (!name || !ops)
+        return -1;
+
+    // Create a filesystem structure
+    filesystem_t *fs = (filesystem_t *)kmalloc(sizeof(filesystem_t));
+    if (!fs)
+    {
+        kprintf("VFS: Failed to allocate filesystem structure\n");
+        return -1;
+    }
+
+    strcpy(fs->name, name);
+    fs->type = FS_TYPE_CLOUDFS; // Default type
+    fs->root = NULL;
+    fs->ops = NULL;         // Not using the old ops structure
+    fs->private_data = ops; // Store VFS operations here
+    fs->next = NULL;
+
+    // Register the filesystem
+    return fs_register(fs);
+}
+
+// Get filesystem statistics
+int vfs_statfs(const char *path, struct statvfs *st)
+{
+    (void)path;
+    (void)st;
+    // TODO: Implement filesystem statistics
+    return -1;
+}
+
+// Seek in a file
+off_t vfs_lseek(int fd, off_t offset, int whence)
+{
+    if (fd < 0 || fd >= MAX_FILE_DESCRIPTORS || !file_descriptors[fd])
+    {
+        return -1;
+    }
+
+    file_descriptor_t *fd_struct = file_descriptors[fd];
+
+    switch (whence)
+    {
+    case 0: // SEEK_SET
+        fd_struct->offset = offset;
+        break;
+    case 1: // SEEK_CUR
+        fd_struct->offset += offset;
+        break;
+    case 2: // SEEK_END
+        // TODO: Need file size for SEEK_END
+        fd_struct->offset = offset; // Placeholder
+        break;
+    default:
+        return -1;
+    }
+
+    return fd_struct->offset;
+}
+
+// Duplicate a file descriptor
+int vfs_dup(int oldfd)
+{
+    if (oldfd < 0 || oldfd >= MAX_FILE_DESCRIPTORS || !file_descriptors[oldfd])
+    {
+        return -1;
+    }
+
+    // Find available file descriptor
+    int newfd = -1;
+    for (int i = 0; i < MAX_FILE_DESCRIPTORS; i++)
+    {
+        if (!file_descriptors[i])
+        {
+            newfd = i;
+            break;
+        }
+    }
+
+    if (newfd == -1)
+    {
+        return -1;
+    }
+
+    // Duplicate the file descriptor
+    file_descriptors[newfd] = file_descriptors[oldfd];
+    file_descriptors[newfd]->ref_count++;
+
+    return newfd;
+}
+
+// Duplicate a file descriptor to a specific number
+int vfs_dup2(int oldfd, int newfd)
+{
+    if (oldfd < 0 || oldfd >= MAX_FILE_DESCRIPTORS || !file_descriptors[oldfd])
+    {
+        return -1;
+    }
+
+    if (newfd < 0 || newfd >= MAX_FILE_DESCRIPTORS)
+    {
+        return -1;
+    }
+
+    // Close newfd if it's already open
+    if (file_descriptors[newfd])
+    {
+        vfs_close(newfd);
+    }
+
+    // Duplicate the file descriptor
+    file_descriptors[newfd] = file_descriptors[oldfd];
+    file_descriptors[newfd]->ref_count++;
+
+    return newfd;
 }

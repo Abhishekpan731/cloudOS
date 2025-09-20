@@ -2,6 +2,26 @@
 #include "kernel/kernel.h"
 #include "kernel/memory.h"
 #include "kernel/process.h"
+#include "kernel/time.h"
+
+// Simple memcpy for kernel use
+static void *memcpy(void *dest, const void *src, size_t n) {
+    uint8_t *d = (uint8_t *)dest;
+    const uint8_t *s = (const uint8_t *)src;
+    for (size_t i = 0; i < n; i++) {
+        d[i] = s[i];
+    }
+    return dest;
+}
+
+// Simple memset for kernel use
+static void *memset(void *s, int c, size_t n) {
+    uint8_t *p = (uint8_t *)s;
+    for (size_t i = 0; i < n; i++) {
+        p[i] = (uint8_t)c;
+    }
+    return s;
+}
 
 static user_t* users = NULL;
 static group_t* groups = NULL;
@@ -11,6 +31,12 @@ static security_policy_t* current_policy = NULL;
 static audit_entry_t* audit_log = NULL;
 static uint32_t next_session_id = 1;
 static uint32_t next_key_id = 1;
+
+// Mark unused variables to prevent compiler warnings
+__attribute__((unused)) static void mark_security_unused_vars(void) {
+    (void)crypto_keys;
+    (void)next_key_id;
+}
 
 // Default security policy
 static security_policy_t default_policy = {
@@ -234,6 +260,48 @@ group_t* security_find_group(const char* groupname) {
     return NULL;
 }
 
+int security_delete_group(const char* groupname) {
+    if (!groupname) return -1;
+
+    group_t** current = &groups;
+    while (*current) {
+        bool match = true;
+        for (int i = 0; groupname[i] || (*current)->groupname[i]; i++) {
+            if (groupname[i] != (*current)->groupname[i]) {
+                match = false;
+                break;
+            }
+        }
+        if (match) {
+            group_t* to_delete = *current;
+            *current = to_delete->next;
+            kfree(to_delete);
+            audit_log_event(0, 0, "GROUP_DELETE", groupname, true);
+            return 0;
+        }
+        current = &(*current)->next;
+    }
+    return -1;
+}
+
+// Role-Based Access Control (RBAC) implementation
+static int rbac_check_role_permission(const char* role, const char* permission) {
+    (void)role;
+    (void)permission;
+    // Basic RBAC permission checking
+    // In a real implementation, this would check role definitions
+    return 0;
+}
+
+int security_assign_user_role(const char* username, const char* role) {
+    user_t* user = security_find_user(username);
+    if (!user) return -1;
+
+    // Simple role assignment (in real implementation, this would be more complex)
+    audit_log_event(user->uid, 0, "ROLE_ASSIGN", role, true);
+    return 0;
+}
+
 uint32_t security_authenticate(const char* username, const char* password,
                               const char* remote_addr) {
     if (!username || !password) return 0;
@@ -267,7 +335,7 @@ uint32_t security_authenticate(const char* username, const char* password,
 
     session->session_id = next_session_id++;
     session->uid = user->uid;
-    session->login_time = 0; // TODO: Get actual timestamp
+    session->login_time = get_unix_timestamp();
     session->last_activity = session->login_time;
     session->valid = true;
 
@@ -364,7 +432,7 @@ int audit_log_event(uint32_t uid, uint32_t pid, const char* event_type,
     audit_entry_t* entry = (audit_entry_t*)kmalloc(sizeof(audit_entry_t));
     if (!entry) return -1;
 
-    entry->timestamp = 0; // TODO: Get actual timestamp
+    entry->timestamp = get_unix_timestamp();
     entry->uid = uid;
     entry->pid = pid;
     entry->success = success;

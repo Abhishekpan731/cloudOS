@@ -30,7 +30,7 @@ typedef struct {
 void hal_init(void);
 void hal_cpu_init(void);
 void hal_interrupt_init(void);
-void hal_timer_init(uint32_t frequency);
+void hal_timer_init_freq(uint32_t frequency);
 void hal_memory_init(void);
 
 void hal_enable_interrupts(void);
@@ -40,6 +40,14 @@ void hal_cpu_relax(void);
 
 uint64_t hal_get_timestamp(void);
 void hal_delay_ms(uint32_t ms);
+
+// Time-related HAL functions
+uint64_t hal_get_timestamp_ns(void);
+uint64_t hal_get_cpu_cycles(void);
+uint64_t hal_get_cpu_frequency(void);
+void hal_timer_init(void);
+void hal_timer_set_frequency(uint32_t hz);
+void hal_timer_interrupt_handler(void);
 
 void hal_invalidate_page(void* addr);
 void hal_flush_tlb(void);

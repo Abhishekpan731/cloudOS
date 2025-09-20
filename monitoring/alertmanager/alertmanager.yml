@@ -1,0 +1,256 @@
+# CloudOS AlertManager Configuration
+global:
+  smtp_smarthost: 'localhost:587'
+  smtp_from: 'cloudos-alerts@cloudos.dev'
+  smtp_auth_username: ''
+  smtp_auth_password: ''
+  smtp_require_tls: false
+
+# Templates for notifications
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# Routing configuration
+route:
+  group_by: ['alertname', 'severity', 'instance']
+  group_wait: 10s
+  group_interval: 5m
+  repeat_interval: 12h
+  receiver: 'cloudos-default'
+  routes:
+    # Critical alerts - immediate notification
+    - match:
+        severity: critical
+      receiver: 'cloudos-critical'
+      group_wait: 0s
+      repeat_interval: 5m
+      routes:
+        # Disk space alerts
+        - match:
+            alertname: DiskSpaceLow
+          receiver: 'cloudos-disk-alerts'
+        # Security alerts
+        - match:
+            alertname: HighAuthenticationFailures
+          receiver: 'cloudos-security-alerts'
+        # Cluster alerts
+        - match:
+            alertname: ClusterNodeDown
+          receiver: 'cloudos-cluster-alerts'
+
+    # Warning alerts - standard notification
+    - match:
+        severity: warning
+      receiver: 'cloudos-warnings'
+      group_interval: 10m
+      repeat_interval: 2h
+
+    # AI Engine specific alerts
+    - match:
+        component: ai-engine
+      receiver: 'cloudos-ai-alerts'
+      group_interval: 5m
+
+    # Container alerts
+    - match:
+        component: container
+      receiver: 'cloudos-container-alerts'
+
+    # Security alerts
+    - match:
+        team: security
+      receiver: 'cloudos-security-alerts'
+      group_wait: 5s
+
+# Inhibition rules
+inhibit_rules:
+  # Inhibit warning alerts when critical is firing
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['instance', 'alertname']
+
+  # Inhibit container alerts when node is down
+  - source_match:
+      alertname: 'NodeDown'
+    target_match:
+      component: 'container'
+    equal: ['instance']
+
+# Notification receivers
+receivers:
+  # Default receiver
+  - name: 'cloudos-default'
+    slack_configs:
+      - api_url: 'YOUR_SLACK_WEBHOOK_URL'
+        channel: '#cloudos-alerts'
+        title: 'CloudOS Alert'
+        text: |
+          {{ range .Alerts }}
+          **Alert:** {{ .Annotations.summary }}
+          **Description:** {{ .Annotations.description }}
+          **Severity:** {{ .Labels.severity }}
+          **Instance:** {{ .Labels.instance }}
+          {{ end }}
+        footer: 'CloudOS Monitoring'
+        color: 'warning'
+
+  # Critical alerts
+  - name: 'cloudos-critical'
+    email_configs:
+      - to: 'ops-team@cloudos.dev'
+        subject: '[CRITICAL] CloudOS Alert: {{ .GroupLabels.alertname }}'
+        body: |
+          Critical alert detected in CloudOS:
+
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Severity: {{ .Labels.severity }}
+          Instance: {{ .Labels.instance }}
+          Started: {{ .StartsAt }}
+          {{ end }}
+
+          Dashboard: http://grafana:3000
+          Prometheus: http://prometheus:9090
+        headers:
+          Subject: '[CRITICAL] CloudOS Alert'
+    slack_configs:
+      - api_url: 'YOUR_SLACK_WEBHOOK_URL'
+        channel: '#cloudos-critical'
+        title: '🚨 CRITICAL CloudOS Alert'
+        text: |
+          {{ range .Alerts }}
+          **Alert:** {{ .Annotations.summary }}
+          **Description:** {{ .Annotations.description }}
+          **Instance:** {{ .Labels.instance }}
+          **Started:** {{ .StartsAt }}
+          {{ end }}
+        color: 'danger'
+
+  # Warning alerts
+  - name: 'cloudos-warnings'
+    slack_configs:
+      - api_url: 'YOUR_SLACK_WEBHOOK_URL'
+        channel: '#cloudos-warnings'
+        title: '⚠️ CloudOS Warning'
+        text: |
+          {{ range .Alerts }}
+          **Alert:** {{ .Annotations.summary }}
+          **Description:** {{ .Annotations.description }}
+          **Severity:** {{ .Labels.severity }}
+          **Instance:** {{ .Labels.instance }}
+          {{ end }}
+        color: 'warning'
+
+  # AI Engine alerts
+  - name: 'cloudos-ai-alerts'
+    email_configs:
+      - to: 'ai-team@cloudos.dev'
+        subject: '[AI] CloudOS AI Engine Alert'
+        body: |
+          AI Engine alert detected:
+
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Model: {{ .Labels.model_id }}
+          Instance: {{ .Labels.instance }}
+          {{ end }}
+    slack_configs:
+      - api_url: 'YOUR_SLACK_WEBHOOK_URL'
+        channel: '#cloudos-ai'
+        title: '🤖 AI Engine Alert'
+        color: 'warning'
+
+  # Container alerts
+  - name: 'cloudos-container-alerts'
+    slack_configs:
+      - api_url: 'YOUR_SLACK_WEBHOOK_URL'
+        channel: '#cloudos-containers'
+        title: '📦 Container Alert'
+        text: |
+          {{ range .Alerts }}
+          **Container:** {{ .Labels.container_name }}
+          **Alert:** {{ .Annotations.summary }}
+          **Instance:** {{ .Labels.instance }}
+          {{ end }}
+        color: 'warning'
+
+  # Security alerts
+  - name: 'cloudos-security-alerts'
+    email_configs:
+      - to: 'security-team@cloudos.dev'
+        subject: '[SECURITY] CloudOS Security Alert'
+        body: |
+          Security alert detected:
+
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Event Type: {{ .Labels.event_type }}
+          Severity: {{ .Labels.severity }}
+          Instance: {{ .Labels.instance }}
+          Time: {{ .StartsAt }}
+          {{ end }}
+
+          Please investigate immediately.
+    slack_configs:
+      - api_url: 'YOUR_SLACK_WEBHOOK_URL'
+        channel: '#cloudos-security'
+        title: '🔒 Security Alert'
+        text: |
+          {{ range .Alerts }}
+          **Alert:** {{ .Annotations.summary }}
+          **Event:** {{ .Labels.event_type }}
+          **Severity:** {{ .Labels.severity }}
+          **Instance:** {{ .Labels.instance }}
+          {{ end }}
+        color: 'danger'
+
+  # Disk alerts
+  - name: 'cloudos-disk-alerts'
+    email_configs:
+      - to: 'ops-team@cloudos.dev'
+        subject: '[DISK] CloudOS Disk Space Alert'
+        body: |
+          Disk space alert:
+
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Device: {{ .Labels.device }}
+          Mount Point: {{ .Labels.mountpoint }}
+          Instance: {{ .Labels.instance }}
+          {{ end }}
+
+          Please free up disk space immediately.
+
+  # Cluster alerts
+  - name: 'cloudos-cluster-alerts'
+    email_configs:
+      - to: 'cluster-admin@cloudos.dev'
+        subject: '[CLUSTER] CloudOS Cluster Alert'
+        body: |
+          Cluster alert detected:
+
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Node: {{ .Labels.instance }}
+          {{ end }}
+    slack_configs:
+      - api_url: 'YOUR_SLACK_WEBHOOK_URL'
+        channel: '#cloudos-cluster'
+        title: '🖥️ Cluster Alert'
+        color: 'danger'
+
+  # Webhook receiver for custom integrations
+  - name: 'cloudos-webhook'
+    webhook_configs:
+      - url: 'http://cloudos-exporter:9200/webhook/alerts'
+        send_resolved: true
+        http_config:
+          basic_auth:
+            username: 'cloudos'
+            password: 'webhook-secret'

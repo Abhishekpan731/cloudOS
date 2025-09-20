@@ -1,0 +1,338 @@
+# CloudOS Alert Rules for Prometheus
+groups:
+  - name: cloudos_system_alerts
+    rules:
+      # CPU Alerts
+      - alert: HighCPUUsage
+        expr: cloudos_system_cpu_usage_percent > 90
+        for: 5m
+        labels:
+          severity: warning
+          component: system
+          team: infrastructure
+        annotations:
+          summary: "High CPU usage detected on {{ $labels.instance }}"
+          description: "CPU usage is {{ $value }}% on core {{ $labels.cpu_core }}"
+          runbook: "https://docs.cloudos.dev/runbooks/high-cpu"
+
+      - alert: CriticalCPUUsage
+        expr: cloudos_system_cpu_usage_percent > 95
+        for: 2m
+        labels:
+          severity: critical
+          component: system
+          team: infrastructure
+        annotations:
+          summary: "Critical CPU usage detected on {{ $labels.instance }}"
+          description: "CPU usage is {{ $value }}% on core {{ $labels.cpu_core }}"
+
+      # Memory Alerts
+      - alert: HighMemoryUsage
+        expr: (cloudos_system_memory_usage_bytes{type="used"} / cloudos_system_memory_usage_bytes{type="total"}) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+          component: system
+          team: infrastructure
+        annotations:
+          summary: "High memory usage detected on {{ $labels.instance }}"
+          description: "Memory usage is {{ $value }}%"
+
+      - alert: CriticalMemoryUsage
+        expr: (cloudos_system_memory_usage_bytes{type="used"} / cloudos_system_memory_usage_bytes{type="total"}) * 100 > 95
+        for: 2m
+        labels:
+          severity: critical
+          component: system
+          team: infrastructure
+        annotations:
+          summary: "Critical memory usage detected on {{ $labels.instance }}"
+          description: "Memory usage is {{ $value }}%"
+
+      # Disk Alerts
+      - alert: DiskSpaceLow
+        expr: (cloudos_system_disk_usage_bytes{type="free"} / cloudos_system_disk_usage_bytes{type="total"}) * 100 < 15
+        for: 1m
+        labels:
+          severity: warning
+          component: system
+          team: infrastructure
+        annotations:
+          summary: "Low disk space on {{ $labels.instance }}"
+          description: "Only {{ $value }}% free space remaining on {{ $labels.mountpoint }}"
+
+      - alert: DiskSpaceCritical
+        expr: (cloudos_system_disk_usage_bytes{type="free"} / cloudos_system_disk_usage_bytes{type="total"}) * 100 < 5
+        for: 30s
+        labels:
+          severity: critical
+          component: system
+          team: infrastructure
+        annotations:
+          summary: "Critical disk space on {{ $labels.instance }}"
+          description: "Only {{ $value }}% free space remaining on {{ $labels.mountpoint }}"
+
+      # Network Alerts
+      - alert: HighNetworkTraffic
+        expr: rate(cloudos_system_network_bytes_total[5m]) > 100 * 1024 * 1024  # 100 MB/s
+        for: 10m
+        labels:
+          severity: warning
+          component: network
+          team: infrastructure
+        annotations:
+          summary: "High network traffic on {{ $labels.instance }}"
+          description: "{{ $labels.direction }} traffic on {{ $labels.interface }} is {{ $value }} bytes/second"
+
+  - name: cloudos_container_alerts
+    rules:
+      # Container Health
+      - alert: ContainerDown
+        expr: cloudos_container_count{state="running"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: container
+          team: platform
+        annotations:
+          summary: "No running containers detected"
+          description: "All containers appear to be stopped"
+
+      - alert: ContainerHighRestarts
+        expr: increase(cloudos_container_restart_count[1h]) > 5
+        for: 1m
+        labels:
+          severity: warning
+          component: container
+          team: platform
+        annotations:
+          summary: "Container {{ $labels.container_name }} restarting frequently"
+          description: "Container has restarted {{ $value }} times in the last hour"
+
+      - alert: ContainerHighCPU
+        expr: cloudos_container_cpu_usage_percent > 80
+        for: 10m
+        labels:
+          severity: warning
+          component: container
+          team: platform
+        annotations:
+          summary: "High CPU usage in container {{ $labels.container_name }}"
+          description: "Container CPU usage is {{ $value }}%"
+
+      - alert: ContainerHighMemory
+        expr: cloudos_container_memory_usage_bytes > 1 * 1024 * 1024 * 1024  # 1GB
+        for: 5m
+        labels:
+          severity: warning
+          component: container
+          team: platform
+        annotations:
+          summary: "High memory usage in container {{ $labels.container_name }}"
+          description: "Container memory usage is {{ $value }} bytes"
+
+  - name: cloudos_ai_engine_alerts
+    rules:
+      # AI Engine Performance
+      - alert: AIInferenceFailureRate
+        expr: (rate(cloudos_ai_inference_requests_total{status="failure"}[5m]) / rate(cloudos_ai_inference_requests_total[5m])) * 100 > 10
+        for: 2m
+        labels:
+          severity: warning
+          component: ai-engine
+          team: ai
+        annotations:
+          summary: "High AI inference failure rate for model {{ $labels.model_id }}"
+          description: "Failure rate is {{ $value }}%"
+
+      - alert: AIInferenceLatencyHigh
+        expr: histogram_quantile(0.95, rate(cloudos_ai_inference_duration_seconds_bucket[5m])) > 5
+        for: 5m
+        labels:
+          severity: warning
+          component: ai-engine
+          team: ai
+        annotations:
+          summary: "High AI inference latency for model {{ $labels.model_id }}"
+          description: "95th percentile latency is {{ $value }} seconds"
+
+      - alert: AIInferenceLatencyCritical
+        expr: histogram_quantile(0.95, rate(cloudos_ai_inference_duration_seconds_bucket[5m])) > 10
+        for: 2m
+        labels:
+          severity: critical
+          component: ai-engine
+          team: ai
+        annotations:
+          summary: "Critical AI inference latency for model {{ $labels.model_id }}"
+          description: "95th percentile latency is {{ $value }} seconds"
+
+      - alert: NoAIModelsLoaded
+        expr: sum(cloudos_ai_model_loaded_count) == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: ai-engine
+          team: ai
+        annotations:
+          summary: "No AI models are loaded"
+          description: "AI engine has no loaded models available for inference"
+
+  - name: cloudos_security_alerts
+    rules:
+      # Authentication
+      - alert: HighAuthenticationFailures
+        expr: increase(cloudos_auth_attempts_total{result="failure"}[5m]) > 10
+        for: 1m
+        labels:
+          severity: critical
+          component: security
+          team: security
+        annotations:
+          summary: "High authentication failure rate"
+          description: "{{ $value }} authentication failures in the last 5 minutes"
+
+      - alert: LowAuthenticationSuccessRate
+        expr: (rate(cloudos_auth_attempts_total{result="success"}[10m]) / rate(cloudos_auth_attempts_total[10m])) * 100 < 50
+        for: 5m
+        labels:
+          severity: warning
+          component: security
+          team: security
+        annotations:
+          summary: "Low authentication success rate"
+          description: "Success rate is {{ $value }}%"
+
+      # Security Events
+      - alert: HighSecurityEvents
+        expr: rate(cloudos_security_events_total[5m]) > 1
+        for: 2m
+        labels:
+          severity: warning
+          component: security
+          team: security
+        annotations:
+          summary: "High rate of security events"
+          description: "{{ $value }} security events per second of type {{ $labels.event_type }}"
+
+      - alert: CriticalSecurityEvent
+        expr: cloudos_security_events_total{severity="critical"} > 0
+        for: 0s
+        labels:
+          severity: critical
+          component: security
+          team: security
+        annotations:
+          summary: "Critical security event detected"
+          description: "Critical security event of type {{ $labels.event_type }}"
+
+  - name: cloudos_cluster_alerts
+    rules:
+      # Cluster Health
+      - alert: ClusterNodeDown
+        expr: cloudos_cluster_nodes_total{state="unhealthy"} > 0
+        for: 30s
+        labels:
+          severity: critical
+          component: cluster
+          team: platform
+        annotations:
+          summary: "Cluster node is down"
+          description: "{{ $value }} cluster nodes are in unhealthy state"
+
+      - alert: LeaderElectionFailure
+        expr: increase(cloudos_leader_election_total{event_type="failed"}[5m]) > 3
+        for: 1m
+        labels:
+          severity: warning
+          component: cluster
+          team: platform
+        annotations:
+          summary: "Leader election failures detected"
+          description: "{{ $value }} leader election failures in the last 5 minutes"
+
+      - alert: NoClusterLeader
+        expr: cloudos_leader_election_total{event_type="elected"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: cluster
+          team: platform
+        annotations:
+          summary: "No cluster leader elected"
+          description: "Cluster has no active leader"
+
+  - name: cloudos_cost_optimization_alerts
+    rules:
+      # Cost Monitoring
+      - alert: HighCloudCosts
+        expr: increase(cloudos_cost_optimization_savings_total[1d]) < 0
+        for: 10m
+        labels:
+          severity: warning
+          component: cost-optimization
+          team: finops
+        annotations:
+          summary: "Cloud costs increasing without optimization"
+          description: "No cost savings detected in the last day"
+
+  - name: cloudos_incidents_alerts
+    rules:
+      # Incident Management
+      - alert: HighIncidentRate
+        expr: rate(cloudos_incidents_total[10m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          component: self-healing
+          team: sre
+        annotations:
+          summary: "High incident detection rate"
+          description: "{{ $value }} incidents per second detected"
+
+      - alert: RemediationFailure
+        expr: (rate(cloudos_remediation_actions_total{result="failure"}[10m]) / rate(cloudos_remediation_actions_total[10m])) * 100 > 20
+        for: 5m
+        labels:
+          severity: warning
+          component: self-healing
+          team: sre
+        annotations:
+          summary: "High remediation failure rate"
+          description: "{{ $value }}% of remediation actions are failing"
+
+  - name: cloudos_monitoring_alerts
+    rules:
+      # Monitoring System Health
+      - alert: PrometheusTargetDown
+        expr: up == 0
+        for: 2m
+        labels:
+          severity: warning
+          component: monitoring
+          team: sre
+        annotations:
+          summary: "Prometheus target {{ $labels.job }} is down"
+          description: "Target {{ $labels.instance }} of job {{ $labels.job }} is down"
+
+      - alert: PrometheusTSDBCompactionsFailing
+        expr: increase(prometheus_tsdb_compactions_failed_total[1h]) > 0
+        for: 15m
+        labels:
+          severity: warning
+          component: monitoring
+          team: sre
+        annotations:
+          summary: "Prometheus TSDB compactions are failing"
+          description: "{{ $value }} compaction failures in the last hour"
+
+      - alert: GrafanaDown
+        expr: up{job="grafana"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: monitoring
+          team: sre
+        annotations:
+          summary: "Grafana is down"
+          description: "Grafana dashboard service is not responding"

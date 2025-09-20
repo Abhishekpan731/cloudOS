@@ -2,6 +2,9 @@
 #include "kernel/kernel.h"
 #include "kernel/memory.h"
 
+// Forward declarations for ARP functions
+void arp_receive(net_interface_t *iface, net_packet_t *packet);
+
 int eth_send(net_interface_t* iface, const uint8_t* dest_mac, uint16_t ethertype,
              const void* data, size_t size) {
     if (!iface || !dest_mac || !data || size > MTU_SIZE) return -1;
@@ -81,8 +84,7 @@ void eth_receive(net_interface_t* iface, net_packet_t* packet) {
             break;
 
         case ETH_TYPE_ARP:
-            // TODO: Implement ARP
-            net_free_packet(payload_packet);
+            arp_receive(iface, payload_packet);
             break;
 
         default:

@@ -1,0 +1,99 @@
+# Grafana datasource configuration for CloudOS
+apiVersion: 1
+
+datasources:
+  # Prometheus - Main metrics datasource
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: true
+    basicAuth: false
+    jsonData:
+      httpMethod: POST
+      queryTimeout: 60s
+      timeInterval: 15s
+      manageAlerts: true
+      alertmanagerUid: alertmanager
+      prometheusType: Prometheus
+      prometheusVersion: 2.47.0
+      cacheLevel: 'High'
+      disableMetricsLookup: false
+      customQueryParameters: ''
+      httpHeaderName1: 'X-CloudOS-Source'
+    secureJsonData:
+      httpHeaderValue1: 'grafana'
+
+  # Loki - Log datasource
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    editable: true
+    basicAuth: false
+    jsonData:
+      maxLines: 1000
+      timeout: 60s
+      httpHeaderName1: 'X-CloudOS-Source'
+    secureJsonData:
+      httpHeaderValue1: 'grafana'
+
+  # Jaeger - Tracing datasource
+  - name: Jaeger
+    type: jaeger
+    access: proxy
+    url: http://jaeger:16686
+    editable: true
+    basicAuth: false
+    jsonData:
+      httpMethod: GET
+      tracesToLogsV2:
+        datasourceUid: 'loki'
+        spanStartTimeShift: '-1h'
+        spanEndTimeShift: '1h'
+        tags: ['job', 'instance', 'pod', 'namespace']
+        filterByTraceID: false
+        filterBySpanID: false
+        customQuery: true
+        query: 'method="${__span.tags.method}"'
+      tracesToMetrics:
+        datasourceUid: 'prometheus'
+        spanStartTimeShift: '-1h'
+        spanEndTimeShift: '1h'
+        tags: [
+          { key: 'service.name', value: 'service' },
+          { key: 'service.namespace', value: 'namespace' }
+        ]
+        queries:
+          - name: 'Sample query'
+            query: 'histogram_quantile(0.5, sum(rate(traces_spanmetrics_latency_bucket{$$__tags}[5m])) by (le))'
+      nodeGraph:
+        enabled: true
+      search:
+        hide: false
+      spanBar:
+        type: 'Tag'
+        tag: 'http.path'
+
+  # AlertManager - Alert datasource
+  - name: AlertManager
+    type: alertmanager
+    access: proxy
+    url: http://alertmanager:9093
+    editable: true
+    basicAuth: false
+    jsonData:
+      implementation: prometheus
+      handleGrafanaManagedAlerts: true
+      httpHeaderName1: 'X-CloudOS-Source'
+    secureJsonData:
+      httpHeaderValue1: 'grafana'
+
+  # TestData - For testing and development
+  - name: TestData
+    type: testdata
+    access: proxy
+    editable: false
+    jsonData:
+      scenario: 'random_walk'

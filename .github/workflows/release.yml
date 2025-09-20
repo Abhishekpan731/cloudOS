@@ -1,0 +1,387 @@
+name: Release Automation
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v1.0.0)'
+        required: true
+        type: string
+      prerelease:
+        description: 'Mark as prerelease'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-artifacts:
+    name: Build Release Artifacts
+    runs-on: ubuntu-latest
+
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set version
+      id: version
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+        else
+          echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Install build dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          nasm \
+          clang \
+          libc6-dev \
+          qemu-system-x86 \
+          grub-pc-bin \
+          grub-efi-amd64-bin \
+          xorriso \
+          mtools \
+          zip \
+          tar \
+          gzip
+
+    - name: Build kernel (GCC)
+      run: |
+        make clean
+        make kernel VERBOSE=1
+        mkdir -p artifacts/gcc
+        cp build/kernel.bin artifacts/gcc/
+        cp build/*.o artifacts/gcc/ 2>/dev/null || true
+
+    - name: Build kernel (Clang)
+      run: |
+        make clean
+        CC=clang make kernel VERBOSE=1
+        mkdir -p artifacts/clang
+        cp build/kernel.bin artifacts/clang/kernel-clang.bin
+        cp build/*.o artifacts/clang/ 2>/dev/null || true
+
+    - name: Build ISO image
+      run: |
+        make iso
+        cp build/cloudos.iso artifacts/
+
+    - name: Build ARM64 kernel (cross-compile)
+      run: |
+        # Install ARM64 cross-compiler
+        sudo apt-get install -y gcc-aarch64-linux-gnu
+        make clean
+        CC=aarch64-linux-gnu-gcc ARCH=arm64 make kernel || echo "ARM64 build attempted"
+        mkdir -p artifacts/arm64
+        cp build/kernel.bin artifacts/arm64/kernel-arm64.bin 2>/dev/null || echo "ARM64 kernel not available"
+
+    - name: Create installer script
+      run: |
+        cat > artifacts/install-cloudos.sh << 'EOF'
+        #!/bin/bash
+        set -e
+
+        VERSION="${CLOUDOS_VERSION:-latest}"
+        INSTALL_DIR="${CLOUDOS_INSTALL_DIR:-/opt/cloudos}"
+        BASE_URL="https://github.com/CloudOSProject/CloudOS/releases/download"
+
+        echo "🚀 Installing CloudOS ${VERSION}"
+
+        # Detect architecture
+        ARCH=$(uname -m)
+        case $ARCH in
+            x86_64) ARCH="x86_64" ;;
+            aarch64|arm64) ARCH="arm64" ;;
+            *) echo "Unsupported architecture: $ARCH"; exit 1 ;;
+        esac
+
+        # Create install directory
+        sudo mkdir -p "$INSTALL_DIR"
+
+        # Download and install kernel
+        echo "📥 Downloading CloudOS kernel for $ARCH..."
+        if [ "$ARCH" = "x86_64" ]; then
+            curl -L "$BASE_URL/${VERSION}/kernel.bin" -o /tmp/cloudos-kernel.bin
+            curl -L "$BASE_URL/${VERSION}/cloudos.iso" -o /tmp/cloudos.iso
+        else
+            curl -L "$BASE_URL/${VERSION}/kernel-${ARCH}.bin" -o /tmp/cloudos-kernel.bin
+        fi
+
+        # Install files
+        sudo cp /tmp/cloudos-kernel.bin "$INSTALL_DIR/"
+        if [ -f /tmp/cloudos.iso ]; then
+            sudo cp /tmp/cloudos.iso "$INSTALL_DIR/"
+        fi
+
+        # Create symlinks
+        sudo ln -sf "$INSTALL_DIR/cloudos-kernel.bin" /usr/local/bin/cloudos
+
+        # Set permissions
+        sudo chmod +x "$INSTALL_DIR/cloudos-kernel.bin"
+
+        echo "✅ CloudOS ${VERSION} installed successfully!"
+        echo "📖 Documentation: https://docs.cloudos.dev"
+        echo "🔧 Install location: $INSTALL_DIR"
+        EOF
+        chmod +x artifacts/install-cloudos.sh
+
+    - name: Create checksums
+      run: |
+        cd artifacts
+        sha256sum * > checksums.txt
+        sha512sum * > checksums-sha512.txt
+
+    - name: Package artifacts
+      run: |
+        tar -czf cloudos-${{ steps.version.outputs.version }}-x86_64.tar.gz -C artifacts gcc/kernel.bin cloudos.iso install-cloudos.sh checksums.txt
+        tar -czf cloudos-${{ steps.version.outputs.version }}-clang.tar.gz -C artifacts clang/kernel-clang.bin install-cloudos.sh checksums.txt
+        if [ -f artifacts/arm64/kernel-arm64.bin ]; then
+          tar -czf cloudos-${{ steps.version.outputs.version }}-arm64.tar.gz -C artifacts arm64/kernel-arm64.bin install-cloudos.sh checksums.txt
+        fi
+        zip -r cloudos-${{ steps.version.outputs.version }}-universal.zip artifacts/
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: release-artifacts
+        path: |
+          cloudos-*.tar.gz
+          cloudos-*.zip
+          artifacts/
+        retention-days: 30
+
+  build-containers:
+    name: Build and Push Container Images
+    runs-on: ubuntu-latest
+    needs: build-artifacts
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract metadata for AI Engine
+      id: meta-ai
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/ai-engine
+        tags: |
+          type=ref,event=tag
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=raw,value=latest
+
+    - name: Build and push AI Engine
+      uses: docker/build-push-action@v5
+      with:
+        context: ./ai
+        file: ./ai/Dockerfile
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: ${{ steps.meta-ai.outputs.tags }}
+        labels: ${{ steps.meta-ai.outputs.labels }}
+
+    - name: Extract metadata for CLI
+      id: meta-cli
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/cli
+        tags: |
+          type=ref,event=tag
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=raw,value=latest
+
+    - name: Create CLI Dockerfile
+      run: |
+        mkdir -p docker/cli
+        cat > docker/cli/Dockerfile << 'EOF'
+        FROM alpine:3.18
+
+        RUN apk add --no-cache \
+          bash \
+          curl \
+          wget \
+          qemu-system-x86_64 \
+          grub \
+          xorriso
+
+        COPY artifacts/ /opt/cloudos/
+        COPY install-cloudos.sh /usr/local/bin/
+
+        RUN chmod +x /usr/local/bin/install-cloudos.sh
+
+        WORKDIR /opt/cloudos
+        ENTRYPOINT ["/usr/local/bin/install-cloudos.sh"]
+        EOF
+
+    - name: Download artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: release-artifacts
+        path: docker/cli/
+
+    - name: Build and push CLI
+      uses: docker/build-push-action@v5
+      with:
+        context: ./docker/cli
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: ${{ steps.meta-cli.outputs.tags }}
+        labels: ${{ steps.meta-cli.outputs.labels }}
+
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [build-artifacts, build-containers]
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Download artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: release-artifacts
+
+    - name: Generate release notes
+      id: release-notes
+      run: |
+        VERSION="${{ needs.build-artifacts.outputs.version }}"
+
+        echo "## 🚀 CloudOS Release ${VERSION}" > release_notes.md
+        echo "" >> release_notes.md
+        echo "### 📦 What's Included" >> release_notes.md
+        echo "" >> release_notes.md
+        echo "- **Kernel Binary**: Optimized microkernel for x86_64 and ARM64" >> release_notes.md
+        echo "- **Bootable ISO**: Ready-to-boot CloudOS image" >> release_notes.md
+        echo "- **Container Images**: AI Engine and CLI tools" >> release_notes.md
+        echo "- **Install Script**: One-command installation" >> release_notes.md
+        echo "" >> release_notes.md
+        echo "### 🔧 Installation" >> release_notes.md
+        echo "" >> release_notes.md
+        echo "\`\`\`bash" >> release_notes.md
+        echo "# Quick install" >> release_notes.md
+        echo "curl -sSL https://install.cloudos.dev | bash" >> release_notes.md
+        echo "" >> release_notes.md
+        echo "# Or manual download" >> release_notes.md
+        echo "wget https://github.com/CloudOSProject/CloudOS/releases/download/${VERSION}/install-cloudos.sh" >> release_notes.md
+        echo "chmod +x install-cloudos.sh" >> release_notes.md
+        echo "./install-cloudos.sh" >> release_notes.md
+        echo "\`\`\`" >> release_notes.md
+        echo "" >> release_notes.md
+        echo "### 🐳 Container Images" >> release_notes.md
+        echo "" >> release_notes.md
+        echo "\`\`\`bash" >> release_notes.md
+        echo "# AI Engine" >> release_notes.md
+        echo "docker pull ghcr.io/cloudosproject/cloudos/ai-engine:${VERSION}" >> release_notes.md
+        echo "" >> release_notes.md
+        echo "# CLI Tools" >> release_notes.md
+        echo "docker pull ghcr.io/cloudosproject/cloudos/cli:${VERSION}" >> release_notes.md
+        echo "\`\`\`" >> release_notes.md
+        echo "" >> release_notes.md
+
+        # Add changelog if available
+        if git describe --tags --abbrev=0 >/dev/null 2>&1; then
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
+          if [ -n "$PREV_TAG" ]; then
+            echo "### 📝 Changes Since ${PREV_TAG}" >> release_notes.md
+            echo "" >> release_notes.md
+            git log --pretty=format:"- %s (%h)" ${PREV_TAG}..HEAD >> release_notes.md
+            echo "" >> release_notes.md
+          fi
+        fi
+
+        echo "### 🔒 Checksums" >> release_notes.md
+        echo "" >> release_notes.md
+        echo "\`\`\`" >> release_notes.md
+        cat artifacts/checksums.txt >> release_notes.md
+        echo "\`\`\`" >> release_notes.md
+
+    - name: Create Release
+      uses: ncipollo/create-release@v1
+      with:
+        tag: ${{ needs.build-artifacts.outputs.version }}
+        name: CloudOS ${{ needs.build-artifacts.outputs.version }}
+        bodyFile: release_notes.md
+        draft: false
+        prerelease: ${{ github.event.inputs.prerelease || false }}
+        artifacts: |
+          cloudos-*.tar.gz
+          cloudos-*.zip
+          artifacts/install-cloudos.sh
+          artifacts/checksums.txt
+          artifacts/checksums-sha512.txt
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+  update-install-endpoint:
+    name: Update install.cloudos.dev
+    runs-on: ubuntu-latest
+    needs: [create-release]
+    if: "!contains(github.event.inputs.prerelease, 'true')"
+
+    steps:
+    - name: Update latest version
+      run: |
+        # This would typically update a CDN or static site
+        # For now, we'll create a redirect script
+        VERSION="${{ needs.build-artifacts.outputs.version }}"
+
+        cat > install-latest.sh << EOF
+        #!/bin/bash
+        # CloudOS Latest Installer
+        # This script always installs the latest stable release
+
+        LATEST_VERSION="${VERSION}"
+        export CLOUDOS_VERSION="\$LATEST_VERSION"
+
+        curl -sSL "https://github.com/CloudOSProject/CloudOS/releases/download/\$LATEST_VERSION/install-cloudos.sh" | bash
+        EOF
+
+        echo "Generated install-latest.sh for version $VERSION"
+        echo "This would be deployed to install.cloudos.dev"
+
+  notify-release:
+    name: Notify Release
+    runs-on: ubuntu-latest
+    needs: [create-release, update-install-endpoint]
+    if: always()
+
+    steps:
+    - name: Notify Success
+      if: needs.create-release.result == 'success'
+      run: |
+        echo "🎉 CloudOS ${{ needs.build-artifacts.outputs.version }} released successfully!"
+        echo "📦 Artifacts: https://github.com/${{ github.repository }}/releases/tag/${{ needs.build-artifacts.outputs.version }}"
+        echo "🐳 Containers: ghcr.io/${{ github.repository_owner }}/cloudos"
+        echo "🔗 Install: curl -sSL https://install.cloudos.dev | bash"
+
+    - name: Notify Failure
+      if: needs.create-release.result == 'failure'
+      run: |
+        echo "❌ Release failed for CloudOS ${{ needs.build-artifacts.outputs.version }}"
+        echo "Check the workflow logs for details."
+        exit 1

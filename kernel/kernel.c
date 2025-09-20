@@ -8,6 +8,7 @@
 #include "kernel/fs.h"
 #include "kernel/net.h"
 #include "kernel/security.h"
+#include "kernel/time.h"
 
 static uint16_t* const VGA_BUFFER = (uint16_t*)0xB8000;
 static const size_t VGA_WIDTH = 80;
@@ -91,6 +92,11 @@ void kernel_main(void) {
 
     terminal_color = 0x07; // Light gray
     kprintf("Microkernel Architecture: Active\n");
+
+    // Initialize time management
+    kprintf("Time Management: Initializing...\n");
+    time_init();
+    kprintf("Time Management: Ready\n");
 
     // Initialize memory management
     kprintf("Memory Management: Initializing...\n");

@@ -152,7 +152,7 @@ typedef struct socket {
 #define ETH_TYPE_ARP    0x0806
 
 // Network stack initialization
-void net_init(void);
+int net_init(void);
 
 // Interface management
 int net_register_interface(net_interface_t* iface);
@@ -185,14 +185,21 @@ int udp_send(uint32_t dest_ip, uint16_t dest_port, uint16_t src_port,
 void udp_receive(net_interface_t* iface, net_packet_t* packet);
 
 // Socket API
+struct sockaddr;
+typedef uint32_t socklen_t;
+
 int net_socket(int domain, int type, int protocol);
-int net_bind(int sockfd, const struct sockaddr_in* addr, size_t addrlen);
+int net_bind(int sockfd, const struct sockaddr* addr, socklen_t addrlen);
 int net_listen(int sockfd, int backlog);
-int net_accept(int sockfd, struct sockaddr_in* addr, size_t* addrlen);
-int net_connect(int sockfd, const struct sockaddr_in* addr, size_t addrlen);
+int net_accept(int sockfd, struct sockaddr* addr, socklen_t* addrlen);
+int net_connect(int sockfd, const struct sockaddr* addr, socklen_t addrlen);
 ssize_t net_send(int sockfd, const void* buf, size_t len, int flags);
 ssize_t net_recv(int sockfd, void* buf, size_t len, int flags);
-int net_close_socket(int sockfd);
+ssize_t net_sendto(int sockfd, const void* buf, size_t len, int flags,
+                   const struct sockaddr* dest_addr, socklen_t addrlen);
+ssize_t net_recvfrom(int sockfd, void* buf, size_t len, int flags,
+                     struct sockaddr* src_addr, socklen_t* addrlen);
+int net_close(int sockfd);
 
 // Utility functions
 uint16_t net_checksum(const void* data, size_t size);

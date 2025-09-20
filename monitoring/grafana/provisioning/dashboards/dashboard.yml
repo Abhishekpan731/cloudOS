@@ -1,0 +1,58 @@
+# Grafana dashboard provisioning configuration
+apiVersion: 1
+
+providers:
+  # CloudOS System Dashboards
+  - name: cloudos-system
+    orgId: 1
+    folder: 'CloudOS System'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards/system
+
+  # CloudOS Application Dashboards
+  - name: cloudos-applications
+    orgId: 1
+    folder: 'CloudOS Applications'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards/applications
+
+  # CloudOS AI Engine Dashboards
+  - name: cloudos-ai
+    orgId: 1
+    folder: 'CloudOS AI Engine'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards/ai
+
+  # CloudOS Security Dashboards
+  - name: cloudos-security
+    orgId: 1
+    folder: 'CloudOS Security'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards/security
+
+  # CloudOS Cluster Dashboards
+  - name: cloudos-cluster
+    orgId: 1
+    folder: 'CloudOS Cluster'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards/cluster

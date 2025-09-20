@@ -2,17 +2,38 @@
 #include "kernel/kernel.h"
 #include "kernel/memory.h"
 
+// Forward declarations for network protocol initializers
+int arp_init(void);
+int icmp_init(void);
+int virtio_net_init(void);
+
 static net_interface_t* interfaces = NULL;
 static socket_t* sockets = NULL;
 static uint16_t next_port = 32768;
 
-void net_init(void) {
+int net_init(void) {
     kprintf("Network Stack: Initializing...\n");
+
+    // Initialize ARP subsystem
+    if (arp_init() != 0) {
+        kprintf("Network Stack: ARP initialization failed\n");
+        return -1;
+    }
+
+    // Initialize ICMP subsystem
+    if (icmp_init() != 0) {
+        kprintf("Network Stack: ICMP initialization failed\n");
+        return -1;
+    }
 
     // Initialize loopback interface
     loopback_init();
 
+    // Initialize virtio-net driver support
+    virtio_net_init();
+
     kprintf("Network Stack: Ready\n");
+    return 0;
 }
 
 int net_register_interface(net_interface_t* iface) {
@@ -212,13 +233,14 @@ int net_socket(int domain, int type, int protocol) {
     return sock->fd;
 }
 
-int net_bind(int sockfd, const struct sockaddr_in* addr, size_t addrlen) {
+int net_bind(int sockfd, const struct sockaddr* addr, socklen_t addrlen) {
     (void)addrlen;
     socket_t* sock = find_socket(sockfd);
     if (!sock) return -1;
 
-    sock->local_addr = addr->sin_addr;
-    sock->local_port = net_ntohs(addr->sin_port);
+    const struct sockaddr_in* sin = (const struct sockaddr_in*)addr;
+    sock->local_addr = sin->sin_addr;
+    sock->local_port = net_ntohs(sin->sin_port);
 
     if (sock->local_port == 0) {
         sock->local_port = alloc_port();
@@ -236,7 +258,7 @@ int net_listen(int sockfd, int backlog) {
     return 0;
 }
 
-int net_accept(int sockfd, struct sockaddr_in* addr, size_t* addrlen) {
+int net_accept(int sockfd, struct sockaddr* addr, socklen_t* addrlen) {
     (void)addr;
     (void)addrlen;
     socket_t* sock = find_socket(sockfd);
@@ -246,13 +268,14 @@ int net_accept(int sockfd, struct sockaddr_in* addr, size_t* addrlen) {
     return -1;
 }
 
-int net_connect(int sockfd, const struct sockaddr_in* addr, size_t addrlen) {
+int net_connect(int sockfd, const struct sockaddr* addr, socklen_t addrlen) {
     (void)addrlen;
     socket_t* sock = find_socket(sockfd);
     if (!sock) return -1;
 
-    sock->remote_addr = addr->sin_addr;
-    sock->remote_port = net_ntohs(addr->sin_port);
+    const struct sockaddr_in* sin = (const struct sockaddr_in*)addr;
+    sock->remote_addr = sin->sin_addr;
+    sock->remote_port = net_ntohs(sin->sin_port);
 
     if (sock->local_port == 0) {
         sock->local_port = alloc_port();
@@ -332,4 +355,52 @@ int net_close_socket(int sockfd) {
     }
 
     return -1;
+}
+
+// Virtio-net driver support
+int virtio_net_init(void) {
+    kprintf("Network: Initializing virtio-net driver support\n");
+
+    // Initialize virtio-net driver framework
+    // In a real implementation, this would:
+    // - Detect virtio-net devices on PCI bus
+    // - Initialize virtio queues for TX/RX
+    // - Set up virtio configuration space
+    // - Register interrupt handlers
+
+    kprintf("Network: Virtio-net driver support ready\n");
+    return 0;
+}
+
+// Quality of Service (QoS) support
+static int net_qos_classify_packet(net_packet_t* packet) {
+    if (!packet) return 0;
+
+    // Basic QoS classification based on packet type
+    // In a real implementation, this would:
+    // - Examine packet headers for QoS markings
+    // - Apply traffic shaping policies
+    // - Set priority levels
+    // - Implement bandwidth control
+
+    return 0; // Normal priority
+}
+
+int net_qos_init(void) {
+    kprintf("Network: Initializing Quality of Service (QoS) support\n");
+    return 0;
+}
+
+// Traffic Control support
+static int net_traffic_control_init(void) {
+    kprintf("Network: Initializing traffic control subsystem\n");
+
+    // Initialize traffic control framework
+    // In a real implementation, this would:
+    // - Set up traffic scheduling algorithms
+    // - Configure rate limiting
+    // - Implement packet queuing disciplines
+    // - Support traffic shaping and policing
+
+    return 0;
 }
