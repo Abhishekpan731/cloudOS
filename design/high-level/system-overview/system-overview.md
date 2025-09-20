@@ -26,81 +26,248 @@ CloudOS is a modern microkernel operating system designed specifically for cloud
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    Application Layer                        │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │                 Container Runtime                    │    │
+│  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐     │    │
+│  │  │   Docker    │ │ Kubernetes  │ │  Custom     │     │    │
+│  │  │ Containers  │ │  Services   │ │ Containers  │     │    │
+│  │  └─────────────┘ └─────────────┘ └─────────────┘     │    │
+│  └─────────────────────────────────────────────────────┘    │
 ├─────────────────────────────────────────────────────────────┤
 │              User Space Services                            │
 │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐           │
 │  │ File System │ │  Network    │ │  Security   │           │
 │  │  Services   │ │  Services   │ │  Services   │           │
+│  │             │ │             │ │             │           │
+│  │ ┌─────────┐ │ │ ┌─────────┐ │ │ ┌─────────┐ │           │
+│  │ │  VFS    │ │ │ │  TCP/IP │ │ │ │  Auth   │ │           │
+│  │ │ CloudFS │ │ │ │  Stack  │ │ │ │  Crypto │ │           │
+│  │ │ tmpfs   │ │ │ │ Sockets │ │ │ │  Audit  │ │           │
+│  │ └─────────┘ │ │ └─────────┘ │ │ └─────────┘ │           │
 │  └─────────────┘ └─────────────┘ └─────────────┘           │
 ├─────────────────────────────────────────────────────────────┤
 │                Microkernel Core (<50KB)                     │
 │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐           │
 │  │  Process    │ │   Memory    │ │     IPC     │           │
 │  │  Manager    │ │   Manager   │ │   System    │           │
+│  │             │ │             │ │             │           │
+│  │ ┌─────────┐ │ │ ┌─────────┐ │ │ ┌─────────┐ │           │
+│  │ │Scheduler│ │ │ │  VMM    │ │ │ │ Message │ │           │
+│  │ │Context  │ │ │ │  Paging │ │ │ │  Queue  │ │           │
+│  │ │Switching│ │ │ └─────────┘ │ │ │  Ports  │ │           │
+│  │ └─────────┘ │ └─────────────┘ └─────────┘ │           │
 │  └─────────────┘ └─────────────┘ └─────────────┘           │
 ├─────────────────────────────────────────────────────────────┤
 │            Hardware Abstraction Layer (HAL)                 │
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐           │
+│  │   x86_64    │ │   ARM64     │ │   RISC-V    │           │
+│  │   Support   │ │   Support   │ │   Support   │           │
+│  │             │ │             │ │             │           │
+│  │ ┌─────────┐ │ │ ┌─────────┐ │ │ ┌─────────┐ │           │
+│  │ │  MMU    │ │ │ │  GIC    │ │ │ │  CLINT  │ │           │
+│  │ │  APIC   │ │ │ │  Timer  │ │ │ │  Timer  │ │           │
+│  │ │  Inter- │ │ │ │  MMU    │ │ │ │  Inter- │ │           │
+│  │ │  rupts  │ │ │ └─────────┘ │ │ │  rupts  │ │           │
+│  │ └─────────┘ │ └─────────────┘ └─────────┘ │           │
+│  └─────────────┘ └─────────────┘ └─────────────┘           │
 └─────────────────────────────────────────────────────────────┘
 ```
 
+### Detailed Architecture Layers
+
+#### Application Layer
+
+- **Native Applications**: Direct system call interface
+- **Containerized Applications**: Docker, Kubernetes, custom runtimes
+- **AI/ML Applications**: TensorFlow, PyTorch, custom ML frameworks
+- **Service Mesh**: Istio, Linkerd integration
+- **Serverless Functions**: AWS Lambda-style execution
+
+#### User Space Services Layer
+
+- **Service Discovery**: Automatic service registration and discovery
+- **Load Balancing**: Intelligent traffic distribution
+- **Health Monitoring**: Service health checks and auto-healing
+- **Configuration Management**: Dynamic configuration updates
+- **Logging Aggregation**: Centralized log collection and analysis
+
+#### Microkernel Core Layer
+
+- **Scheduler**: Multi-level feedback queue scheduler
+- **Memory Manager**: Demand paging with copy-on-write
+- **IPC Manager**: Message passing with zero-copy optimization
+- **Security Manager**: Capability-based access control
+- **System Call Dispatcher**: Fast system call routing
+
+#### Hardware Abstraction Layer
+
+- **CPU Abstraction**: Unified interface for x86_64, ARM64, RISC-V
+- **Memory Abstraction**: Physical and virtual memory management
+- **Interrupt Abstraction**: Platform-independent interrupt handling
+- **Timer Abstraction**: High-precision timing services
+- **I/O Abstraction**: Device-independent I/O operations
+
 ### Key Architectural Benefits
+
 - **Fault Isolation** - Service failures don't crash the kernel
 - **Security** - Minimal kernel attack surface
 - **Modularity** - Services can be updated independently
 - **Portability** - HAL enables cross-platform support
 - **Performance** - Optimized for modern hardware
+- **Scalability** - Horizontal and vertical scaling support
+- **Observability** - Comprehensive monitoring and tracing
+- **Maintainability** - Clean separation of concerns
 
 ## System Components
 
 ### 1. Microkernel Core
+
 **Size**: <50KB
 **Location**: Kernel space
 **Responsibilities**:
+
 - Process scheduling and management
 - Memory management (virtual memory, paging)
 - Inter-process communication (IPC)
 - Basic security and access control
 - Hardware interrupt handling
+- System call dispatching
+- Timer management
+- Power management
+
+#### Process Management Subsystem
+
+```text
+Process Lifecycle:
+Created → Ready → Running → Waiting → Terminated
+    ↑       ↓       ↑       ↑
+    └───────┼───────┼───────┘
+        Scheduling Events
+```
+
+#### Memory Management Subsystem
+
+```text
+Virtual Address Space Layout:
+┌─────────────────┐ 0xFFFFFFFFFFFFFFFF
+│   Kernel Space  │
+├─────────────────┤ 0x8000000000000000
+│                 │
+│   User Space    │
+│   (512GB)       │
+│                 │
+├─────────────────┤ 0x0000800000000000
+│   Guard Page    │
+├─────────────────┤ 0x00007FFFFFFFFFFF
+│   Stack         │
+├─────────────────┤ 0x00007FFFE0000000
+│   Memory Mapped │
+│   Files/Devices │
+├─────────────────┤ 0x00007FFF80000000
+│   Heap          │
+├─────────────────┤ 0x00007FFF70000000
+│   BSS/Data      │
+├─────────────────┤ 0x00007FFF60000000
+│   Text/Code     │
+└─────────────────┘ 0x0000000000000000
+```
 
 ### 2. Hardware Abstraction Layer (HAL)
-**Supported Platforms**: x86_64 (primary), ARM64 (secondary)
+
+**Supported Platforms**: x86_64 (primary), ARM64 (secondary), RISC-V (experimental)
 **Responsibilities**:
+
 - CPU-specific operations (context switching, MMU)
 - Platform-specific hardware access
 - Interrupt controller management
 - Timer and clock management
+- Power management
+- Hardware discovery and enumeration
+
+#### Platform-Specific Components
+
+**x86_64 HAL**:
+
+- APIC (Advanced Programmable Interrupt Controller)
+- MMU (Memory Management Unit) with 4KB/2MB/1GB pages
+- TSC (Time Stamp Counter) for high-precision timing
+- ACPI (Advanced Configuration and Power Interface)
+- PCIe bus enumeration and management
+
+**ARM64 HAL**:
+
+- GIC (Generic Interrupt Controller) v3/v4
+- MMU with 4KB/16KB/64KB page sizes
+- Generic Timer system
+- PSCI (Power State Coordination Interface)
+- SMBIOS/DTB device tree parsing
 
 ### 3. User Space Services
+
 **Execution Context**: User space processes
 **Communication**: IPC and system calls
 
 #### File System Services
+
 - **Virtual File System (VFS)** - Unified file system interface
 - **CloudFS** - Cloud-optimized file system with compression
 - **tmpfs** - In-memory temporary file system
 - **devfs** - Device file system for hardware access
+- **procfs** - Process information file system
+- **sysfs** - System configuration file system
 
 #### Network Services
+
 - **TCP/IP Stack** - Full networking protocol implementation
 - **Socket API** - POSIX-compatible socket interface
 - **Network Drivers** - Ethernet, WiFi, and other network interfaces
-- **Protocol Support** - IPv4/IPv6, TCP, UDP, ICMP
+- **Protocol Support** - IPv4/IPv6, TCP, UDP, ICMP, ARP
+- **Firewall** - Packet filtering and NAT
+- **VPN Support** - IPSec, WireGuard, OpenVPN
+- **Load Balancing** - Layer 4/7 load balancing
 
 #### Security Services
+
 - **Authentication** - User and service authentication
 - **Authorization** - Capability-based access control
-- **Cryptography** - Built-in crypto services (AES, RSA, SHA)
+- **Cryptography** - Built-in crypto services (AES, RSA, SHA, ECC)
 - **Audit System** - Comprehensive security event logging
+- **TPM Integration** - Hardware security module support
+- **Secure Boot** - UEFI Secure Boot integration
+- **Key Management** - Hardware and software key storage
 
 #### Device Services
+
 - **Device Framework** - Generic device driver architecture
 - **Console Driver** - System console and terminal support
-- **Storage Drivers** - NVMe, SATA, and other storage interfaces
-- **Input Drivers** - Keyboard, mouse, and other input devices
+- **Storage Drivers** - NVMe, SATA, SAS, and other storage interfaces
+- **Input Drivers** - Keyboard, mouse, touchscreen, and other input devices
+- **Graphics Drivers** - GPU acceleration and display support
+- **Audio Drivers** - Sound card and audio processing
+- **USB Drivers** - Universal Serial Bus support
+
+#### AI/ML Services
+
+- **Inference Engine** - High-performance ML model execution
+- **Training Framework** - Distributed training coordination
+- **Model Optimization** - Quantization and pruning services
+- **GPU/TPU Management** - Accelerator resource management
+- **Federated Learning** - Privacy-preserving distributed learning
+- **Model Serving** - REST/gRPC API for model inference
+
+#### Container Services
+
+- **Runtime Manager** - Container lifecycle management
+- **Image Registry** - Local and remote image storage
+- **Network Overlay** - Container networking
+- **Volume Management** - Persistent storage for containers
+- **Security Policies** - Container security profiles
+- **Resource Limits** - CPU, memory, and I/O constraints
 
 ## System Characteristics
 
 ### Performance Metrics
+
 | Metric | Target | Achieved |
 |--------|---------|-----------|
 | Kernel Size | <50KB | 45KB |
@@ -111,6 +278,7 @@ CloudOS is a modern microkernel operating system designed specifically for cloud
 | Network Throughput | Wire Speed | 95% wire speed |
 
 ### Scalability Characteristics
+
 - **CPU Cores** - Up to 256 cores (SMP)
 - **Memory** - Up to 1TB RAM per system
 - **Storage** - Unlimited (network-attached)
@@ -118,6 +286,7 @@ CloudOS is a modern microkernel operating system designed specifically for cloud
 - **Containers** - Up to 10,000 containers per node
 
 ### Security Features
+
 - **Capability System** - Fine-grained access control
 - **Address Space Layout Randomization (ASLR)**
 - **Stack Protection** - Canary-based overflow protection
@@ -128,8 +297,10 @@ CloudOS is a modern microkernel operating system designed specifically for cloud
 ## Development Phases
 
 ### Phase 1: Foundation Layer ✅ **COMPLETED**
+
 **Status**: Fully implemented and tested
 **Components**:
+
 - [x] Microkernel core implementation
 - [x] Memory management (physical and virtual)
 - [x] Process scheduling and management
@@ -141,8 +312,10 @@ CloudOS is a modern microkernel operating system designed specifically for cloud
 - [x] Security framework
 
 ### Phase 2: AI Engine (Planned)
+
 **Target**: Q2 2024
 **Components**:
+
 - [ ] AI service framework
 - [ ] Machine learning inference engine
 - [ ] Neural network acceleration support
@@ -151,8 +324,10 @@ CloudOS is a modern microkernel operating system designed specifically for cloud
 - [ ] Federated learning capabilities
 
 ### Phase 3: Cloud Integration (Planned)
+
 **Target**: Q3 2024
 **Components**:
+
 - [ ] Container orchestration engine
 - [ ] Service mesh integration
 - [ ] Distributed storage support
@@ -163,21 +338,24 @@ CloudOS is a modern microkernel operating system designed specifically for cloud
 ## Data Flow Architecture
 
 ### System Call Flow
-```
+
+```text
 Application → System Call Interface → Microkernel → HAL → Hardware
      ↑                                     ↓
      └─────── Response ←─── Result ←───────┘
 ```
 
 ### Service Communication Flow
-```
+
+```text
 App → IPC → Service A → IPC → Service B → System Call → Kernel
  ↑                                                        ↓
  └────── Response ←── IPC ←───── IPC ←─── Response ←──────┘
 ```
 
 ### Network Data Flow
-```
+
+```text
 Application → Socket API → Network Service → TCP/IP Stack
      ↓                                              ↓
 Network Driver → HAL → Hardware → Network Interface
@@ -186,24 +364,28 @@ Network Driver → HAL → Hardware → Network Interface
 ## Quality Attributes
 
 ### Reliability
+
 - **MTBF** - >99.99% uptime target
 - **Fault Tolerance** - Service isolation prevents cascade failures
 - **Recovery** - Automatic service restart and error recovery
 - **Monitoring** - Built-in health monitoring and metrics
 
 ### Security
+
 - **Attack Surface** - Minimal kernel reduces attack vectors
 - **Privilege Separation** - Services run with minimal privileges
 - **Encryption** - Data encryption at rest and in transit
 - **Compliance** - Common Criteria EAL4+ target
 
 ### Performance
+
 - **Low Latency** - Sub-microsecond context switching
 - **High Throughput** - Optimized for modern multi-core systems
 - **Memory Efficiency** - Minimal memory overhead
 - **I/O Performance** - Zero-copy networking and storage
 
 ### Maintainability
+
 - **Modular Design** - Independent service updates
 - **Clean Interfaces** - Well-defined API boundaries
 - **Documentation** - Comprehensive design and API docs
@@ -212,12 +394,14 @@ Network Driver → HAL → Hardware → Network Interface
 ## Future Evolution
 
 ### Emerging Technologies
+
 - **Quantum Computing** - Quantum-safe cryptography integration
 - **Neuromorphic Computing** - Support for brain-inspired processors
 - **Persistent Memory** - Integration with Intel Optane and similar
 - **5G/6G Networks** - Ultra-low latency networking support
 
 ### Market Trends
+
 - **Serverless Computing** - Function-as-a-Service optimization
 - **Edge-to-Cloud Continuum** - Seamless edge-cloud integration
 - **Sustainability** - Energy-efficient computing optimization
@@ -225,4 +409,6 @@ Network Driver → HAL → Hardware → Network Interface
 
 ---
 
-*CloudOS System Overview v1.0 - Foundation Phase Complete*
+## Document Information
+
+CloudOS System Overview v1.0 - Foundation Phase Complete

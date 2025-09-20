@@ -9,10 +9,26 @@ import json
 import logging
 import math
 import statistics
+import numpy as np
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple, Any
 from dataclasses import dataclass, field
 from enum import Enum
+
+# Machine learning imports for advanced prediction
+try:
+    from sklearn.ensemble import RandomForestRegressor, IsolationForest
+    from sklearn.preprocessing import StandardScaler
+    from sklearn.metrics import mean_absolute_error
+    HAS_SKLEARN = True
+except ImportError:
+    HAS_SKLEARN = False
+
+try:
+    import pandas as pd
+    HAS_PANDAS = True
+except ImportError:
+    HAS_PANDAS = False
 
 from .ai_engine import CloudOSAIEngine, AIRequest, AITaskType
 
