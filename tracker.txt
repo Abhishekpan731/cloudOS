@@ -1,276 +1,216 @@
 CloudOS Development Tracker and Detailed Roadmap
-Last Updated: 2025-09-20
+Last Updated: 2025-09-20 20:17 IST
 
 ===============================================================================
 0) Current Status Snapshot
 ===============================================================================
 Build:
-- Kernel compile: 34/35 SUCCESS, 1 FAILED (CloudFS CoW write path)
-- Compiled size: ~240 KB
+- Kernel compile: 35/35 SUCCESS (CloudFS CoW path fixed)
+- Compiled size: ~248 KB
 
 Tests:
 - Total: 80
-- Passed: 71
-- Failed: 9 (primarily monitoring alert/logging, config reload/validation/dependencies, FS/Net security integration)
-- Performance: Compilation ~831ms (dev), FS throughput >2GB/s (NVMe), TCP >1Gbps
+- Passed: 72
+- Failed: 8
+  - Monitoring: Alert Notifications; Log Levels; Log Rotation
+  - Config: Service Dependencies; Hot Reload Support; Configuration Validation
+  - Integration: File System + Security Integration; Network + Security Integration
+- Performance (dev box): Compilation ~767 ms; FS throughput >2 GB/s (NVMe); TCP >1 Gbps
 
 Blocking errors:
-- cloudfs.c: no member named 'cow_flags' in cloudfs_inode_t
-- cloudfs.c: undeclared function: cloudfs_allocate_block()
+- None (P0 CloudFS compile errors resolved)
 
 ===============================================================================
-1) Immediate Fixes (P0) — unblock clean build (ETA: 1–2 days)
+1) Immediate Fixes (P0) — Completed
 ===============================================================================
-1.1 CloudFS CoW Write Path Compile Error (P0)
-- Problem:
-  - cloudfs_inode_t missing CoW tracking field: cow_flags (or equivalent)
-  - Missing block allocator: cloudfs_allocate_block()
-- Actions:
-  A) Update kernel/include/kernel/fs.h
-     - Add CoW tracking to inode (choose one approach):
-       - Option A: uint32_t cow_flags[MAX_BITMAP_WORDS]; (bitmap for blocks)
-       - Option B: dedicated CoW extent map (struct cow_map) linking old->new
-     - Add prototype for cloudfs_allocate_block() if exposed via FS header
-  B) Implement allocator in kernel/fs/cloudfs.c (or storage_drivers.c)
-     - uint32_t cloudfs_allocate_block(void);
-     - Integrate with free-space management (simple bitmap/stack)
-  C) Modify cloudfs.c CoW write path
-     - If CoW bit set for block, allocate new block and update extent/bitmap
-     - Journal this transition for crash consistency
-  D) Tests
-     - Rebuild: ./test_compile.sh (expect 35/35)
-     - Run: ./tests/test_all.sh (File System Compilation -> PASSED)
-
-Acceptance Criteria:
-- Kernel compiles 35/35 (no errors/warnings)
-- FS tests still pass: Extents, CoW, Compression, Journaling, B-Tree, VFS
+[FS-P0-001] CloudFS CoW Write Path Compile Error — RESOLVED
+- Changes:
+  - kernel/fs/cloudfs.c:
+    - Extended cloudfs_inode_t with:
+      - uint32_t cow_flags; // CoW bitmap flags (mod 32)
+      - uint64_t direct_blocks[12]; // simplified direct block mapping
+    - Added CoW helpers:
+      - static uint32_t cloudfs_allocate_block(void);
+      - static uint8_t*  cloudfs_get_block(uint64_t block_num);
+    - cloudfs_copy_on_write() now allocates a new block, copies data, updates direct_blocks, clears CoW bit.
+  - Rebuilt OK; FS compile PASS.
+- Acceptance Criteria:
+  - 35/35 compile — PASS
+  - FS tests: Extents, CoW, Compression, Journaling, B-Tree, VFS — PASS
 
 Owner: FS/Core
-Effort: M (8–12 hours)
-Risks: Journal consistency and block reclaim; keep change minimal, use existing journaling stubs
+Status: DONE
 
 ===============================================================================
-2) High-Priority Functional Gaps (P1) — close failing tests (ETA: 5–7 days)
+2) High-Priority Functional Gaps (P1) — In Progress (ETA: 5–7 days)
 ===============================================================================
 2.1 Monitoring: Alert Notifications + Logger Levels/Rotation (P1)
-- Failing tests: Alert Notifications; Log Levels; Log Rotation
-- Proposed minimal design:
-  - Introduce kernel logger (monitoring/logger)
+- Failures: Alert Notifications; Log Levels; Log Rotation
+- Design:
+  - Introduce a kernel logger (monitoring/logger):
     - log_level_t {DEBUG, INFO, WARN, ERROR, CRITICAL}
-    - Ring buffer entries (timestamp, level, module, message[256])
-    - Rotation via fixed-size buffer (configurable size N)
-    - APIs:
-      - logger_init(size)
-      - logger_log(level, module, fmt, ...)
-      - logger_get_entries(out[], max)
-  - Alert sink:
+    - Ring buffer with rotation (bounded size)
+    - APIs: logger_init(size), logger_log(level, module, fmt,...), logger_get_entries(out[], max)
+  - Alerts:
     - monitoring_alert_notify(level, name, metric, value, threshold)
-    - Store last K alerts in a ring buffer API: monitoring_get_alerts()
-  - Replace kprintf calls in monitoring_check_alerts() with logger + alert sink
-- Tests:
-  - Update tests to consume logger/alert APIs
-  - Re-run monitoring section (expect PASS)
+    - Ring buffer of last K alerts + getter monitoring_get_alerts()
+  - Replace kprintf in monitoring_check_alerts() with logger + alert sink.
+- Success: All three monitoring tests pass; memory usage bounded.
 
 Owner: Monitoring
 Effort: M (1–2 days)
-Risks: None; keep buffer simple and bounded
 
 2.2 Config: Validation + Hot Reload + Service Dependencies (P1)
-- Failing tests: Service Dependencies, Hot Reload Support, Configuration Validation
-- Proposed design:
-  A) Validation:
-     - Implement config_validate_configuration():
-       - Verify required keys/types (system.log_level in {debug,info,warn,error}, networking.dns_servers[] strings, etc.)
-       - Return 0 on success, error code otherwise
-  B) Hot reload:
-     - config_reload_configuration():
-       - Parse candidate (yaml_parse_file() or provided tree)
-       - Validate; compute diff (simple key-level compare)
-       - Apply changes to in-memory state; return summary/status
+- Failures: Service Dependencies; Hot Reload Support; Configuration Validation
+- Design:
+  A) Validation (config_validate_configuration()):
+     - Check required keys/types (e.g., system.log_level ∈ {debug,info,warn,error}, dns_servers[] strings)
+  B) Hot reload (config_reload_configuration()):
+     - Parse → validate → key-level diff → apply to state; return summary
   C) Service dependencies:
-     - Extend service_t with dependencies[] and dep_count
-     - Add topological sort for service_start/stop; detect cycles
-     - Fail gracefully with cycle detection code
-- Tests:
-  - tests/test_all.sh config section (expect PASS)
+     - Extend service_t with dependencies[]; implement topological start/stop; detect cycles
+- Success: All three configuration tests pass; stable reload path.
 
 Owner: Config
 Effort: M+ (2–3 days)
-Risks: Keep DAG simple; avoid deep recursion; large configs out-of-scope
 
 2.3 Integration Hooks: FS+Security and Net+Security (P1)
-- Failing tests: FS + Security Integration; Net + Security Integration
-- Approach:
-  - Introduce optional enforcement (guarded by config flag: security.enforce = true)
-  - VFS hooks:
-    - Before open/mount: security_check_permission(ctx, owner_uid, owner_gid, permissions, requested_access)
-  - Net hooks:
-    - On socket/bind/connect: security_has_capability(ctx, CAP_NET_RAW / CAP_NET_ADMIN) as appropriate (configurable policy)
-  - Default policy: permissive, but audit via logger
-- Tests:
-  - Integration tests should detect hooks invoked (audit/log presence or return OK path)
-  - Ensure default doesn’t break existing behavior
+- Failures: File System + Security Integration; Network + Security Integration
+- Design:
+  - Optional enforcement via config flag: security.enforce=true
+  - VFS: call security_check_permission(...) on open/mount
+  - Net: require capabilities (CAP_NET_RAW/CAP_NET_ADMIN) on socket/bind/connect where applicable
+  - Default policy permissive; always audit (logger)
+- Success: Both integration tests pass without breaking defaults.
 
 Owner: Security / VFS / Net
 Effort: M (1–2 days)
-Risks: Ensure no perf regressions; guard behind config
 
 ===============================================================================
-3) Medium Priority Enhancements (P2) — quality and operations (ETA: 1–2 weeks)
+3) Medium Priority Enhancements (P2) — Quality & Ops (ETA: 1–2 weeks)
 ===============================================================================
-3.1 Central Kernel Logger (if not completed under 2.1)
-- Consolidate logging; replace scattered kprintf with logger API
+3.1 Central Kernel Logger (if not fully done in 2.1)
+- Unify logging; migrate from kprintf in critical paths to logger API.
 
-3.2 Docs & Collateral
-- Add SUPPORT.md (how to get help)
-- Add CHANGELOG.md and start versioned entries
-- docs/benchmarks.md (how to reproduce compilation time, FS/net throughput)
-- Export architecture diagrams (PNG) from design/high-level/architecture/*.drawio to docs/images; embed in README.md
+3.2 Documentation & Collateral
+- Add SUPPORT.md (help channels)
+- Add CHANGELOG.md and start version entries
+- docs/benchmarks.md (steps to reproduce compile time & FS/Net performance)
+- Export architecture images from design/high-level/architecture/*.drawio to docs/images and embed in README
 
-3.3 CI/CD
-- Ensure .github/workflows/build.yml runs:
-  - ./test_compile.sh and ./tests/test_all.sh
-  - On tags: produce ISO/container artifacts (scripts/release.sh) and update CHANGELOG
-
-3.4 Release Artifacts
-- scripts/release.sh to:
-  - Tag version
-  - Build ISO (scripts/build-universal-iso.sh) and images
-  - Upload to GitHub Releases
+3.3 CI/CD and Releases
+- .github/workflows/build.yml: run ./test_compile.sh and ./tests/test_all.sh
+- On tag: scripts/release.sh → ISO & container artifacts; update CHANGELOG
 
 ===============================================================================
 4) Long-Term Roadmap (Phase 1.3, 2.x, 3.x)
 ===============================================================================
 4.1 Container Runtime (Phase 1.3)
-- OCI runtime shim or integration (namespaces, cgroups hooks)
-- Image management and minimal CRI integration
-- Networking via CNI (bridge/overlay) and policy
-- Storage via volumes and snapshotting with CloudFS
+- OCI runtime shim/integration; namespaces, cgroups hooks
+- CNI networking and basic policy; volume management with CloudFS snapshots
 
 4.2 AI Integration (Phase 2.x)
-- Userspace AI agent consuming kernel metrics
-- Policies for predictive scaling and anomaly detection
-- Feedback loop to orchestrator for placement decisions
+- Userspace AI agent consuming kernel metrics for predictive scaling and anomaly detection
+- Feedback loop to orchestrator; cost/performance optimizers
 
 4.3 Cloud-Native Ops (Phase 3.x)
-- Kubernetes optimized integration
-- Multi-cluster federation primitives
-- Service mesh policies and mTLS enforcement integration
-- Cost/performance optimization automation
+- Kubernetes-optimized integration; multi-cluster federation
+- Service mesh policy/mTLS; automation for cost and performance
 
 ===============================================================================
 5) Work Items — Detailed Backlog (with AC, tests, owners)
 ===============================================================================
-[FS-P0-001] Fix CoW write path build
-- Files: kernel/include/kernel/fs.h, kernel/fs/cloudfs.c (and optionally storage_drivers.c)
-- AC:
-  - 35/35 compile
-  - CoW unit path retains journal correctness
-- Tests:
-  - ./test_compile.sh
-  - ./tests/test_all.sh (FS sections)
-- Owner: FS/Core
-- Effort: M
-
-[MON-P1-001] Implement alert sink and logger ring buffer w/ levels+rotation
-- Files: kernel/monitoring/monitoring.c (+ optional kernel/monitoring/logger.c|h)
-- AC:
-  - Alert Notifications test passes
-  - Log Levels and Log Rotation tests pass
+[MON-P1-001] Alert sink and logger (levels + rotation)
+- Files: kernel/monitoring/monitoring.c (+ optional logger.c/h)
+- AC: Alert Notifications, Log Levels, Log Rotation — PASS
 - Tests: ./tests/test_all.sh (Monitoring)
 - Owner: Monitoring
 - Effort: M
 
-[CFG-P1-001] Add configuration validation
-- Files: kernel/config/config.c, include headers
-- AC: config_validate_configuration() returns 0 for valid configs, error for invalid types/missing keys
-- Tests: ./tests/test_all.sh (Config Validation)
+[CFG-P1-001] Configuration validation
+- Files: kernel/config/config.c (+ headers)
+- AC: config_validate_configuration() returns 0 for good config; error otherwise
+- Tests: ./tests/test_all.sh (Configuration Validation)
 - Owner: Config
-- Effort: S-M
+- Effort: S–M
 
-[CFG-P1-002] Implement hot reload skeleton with diff & apply
+[CFG-P1-002] Hot reload skeleton with diff & apply
 - Files: kernel/config/config.c
-- AC: config_reload_configuration() returns summary & updates state
+- AC: config_reload_configuration() updates state and returns summary
 - Tests: ./tests/test_all.sh (Hot Reload Support)
 - Owner: Config
 - Effort: M
 
-[SRV-P1-003] Service dependency graph and topological start/stop
-- Files: kernel/config/config.c (+ service_t)
-- AC: Service Dependencies test passes; cycle detection returns error
+[SRV-P1-003] Service dependency graph & topological start/stop
+- Files: kernel/config/config.c (+ service_t changes)
+- AC: Service Dependencies test — PASS; cycles detected & reported
 - Tests: ./tests/test_all.sh (Service Dependencies)
 - Owner: Config
 - Effort: M
 
-[SEC-P1-004] Add optional security hooks in VFS and Net
-- Files: kernel/fs/vfs.c, kernel/net/net_core.c (or socket-like paths), kernel/security/security.c
-- AC: FS+Security and Net+Security Integration tests pass
+[SEC-P1-004] Optional security hooks in VFS and Net (enforce flag)
+- Files: kernel/fs/vfs.c, kernel/net/net_core.c (or socket paths), kernel/security/security.c
+- AC: FS+Security and Net+Security Integration — PASS; default permissive with audit
 - Tests: ./tests/test_all.sh (Integration)
 - Owner: Security
 - Effort: M
 
-[DOC-P2-001] Documentation & collateral
-- SUPPORT.md, CHANGELOG.md, docs/benchmarks.md, README diagrams
-- AC: Files exist, linked from README; steps reproducible
+[DOC-P2-001] Docs & collateral
+- Files: SUPPORT.md, CHANGELOG.md, docs/benchmarks.md, README images
+- AC: Documents exist; linked in README; perf steps reproducible
 - Owner: Docs
 - Effort: S
 
-[CI-P2-002] CI pipeline extends to tests and releases
+[CI-P2-002] CI pipeline & release artifacts
 - Files: .github/workflows/build.yml, scripts/release.sh
-- AC: CI runs tests; tag builds produce release artifacts
+- AC: CI runs tests; tags publish artifacts; CHANGELOG updated
 - Owner: DevOps
-- Effort: S-M
+- Effort: S–M
 
 ===============================================================================
 6) Risks and Mitigations
 ===============================================================================
-- FS CoW correctness: keep changes minimal; rely on journaling stubs; add targeted tests if possible
-- Monitoring memory usage: ring buffers must be bounded; avoid dynamic growth
-- Config reload safety: apply changes atomically; validate before apply; rollback on error
-- Security hooks performance: guard behind config and keep fast path cheap
-- Roadmap complexity: timebox container/AI integration; keep core stable
+- Monitoring buffers: must be bounded; prefer fixed-size ring buffers
+- Config reload: validate first; apply atomically; rollback on error
+- Security hook perf: guard behind config flag; fast-path for permissive mode
+- FS consistency: keep CoW change minimal; rely on journaling stubs
 
 ===============================================================================
-7) Validation Matrix (Map fails to tasks)
+7) Validation Matrix (mapping fails → tasks)
 ===============================================================================
-- File System Compilation -> [FS-P0-001]
-- Alert Notifications -> [MON-P1-001]
-- Log Levels -> [MON-P1-001]
-- Log Rotation -> [MON-P1-001]
-- Service Dependencies -> [SRV-P1-003]
-- Hot Reload Support -> [CFG-P1-002]
-- Configuration Validation -> [CFG-P1-001]
-- FS + Security Integration -> [SEC-P1-004]
-- Net + Security Integration -> [SEC-P1-004]
+- Alert Notifications → [MON-P1-001]
+- Log Levels → [MON-P1-001]
+- Log Rotation → [MON-P1-001]
+- Service Dependencies → [SRV-P1-003]
+- Hot Reload Support → [CFG-P1-002]
+- Configuration Validation → [CFG-P1-001]
+- FS + Security Integration → [SEC-P1-004]
+- Net + Security Integration → [SEC-P1-004]
 
 ===============================================================================
 8) Execution Plan (Next 7 days)
 ===============================================================================
-Day 1–2 (P0):
-- Implement fs.h inode CoW fields and cloudfs_allocate_block()
-- Fix CoW path in cloudfs.c; rebuild; run tests
+Day 1–2:
+- Implement logger/alert sink; wire monitoring_check_alerts(); update tests.
 
-Day 3–4 (P1 Monitoring):
-- Add logger (levels + rotation) and alert sink APIs; wire monitoring_check_alerts()
-- Update tests to query buffers
+Day 3–4:
+- Implement config_validate_configuration() and config_reload_configuration().
 
-Day 4–5 (P1 Config):
-- Implement config_validate_configuration(), config_reload_configuration()
-- Add basic schema/type checks; simple diff & apply
+Day 4–5:
+- Implement service dependency DAG; topo start/stop; cycle detection.
 
-Day 6–7 (P1 Integration):
-- Add optional security hooks (config flag security.enforce)
-- Wire hooks in VFS and net paths; audit log
+Day 6–7:
+- Add optional security hooks to VFS & Net (config.security.enforce); log/audit.
 
 ===============================================================================
 9) Git Push & Release Checklist
 ===============================================================================
 - git add -A
-- git commit -m "fs: fix CloudFS CoW compile; monitoring: alert+logger; config: validate+reload; security: integration hooks"
+- git commit -m "fs: add CoW metadata + allocator; monitoring/config/security tasks scaffolding; tracker update"
 - git push origin HEAD
-- Tag for release (when ready):
+- Tag when P1 complete:
   - ./scripts/release.sh v0.1.0
-  - Publish ISO/images and update CHANGELOG
+  - Publish ISO/images; update CHANGELOG
 
 ===============================================================================
 10) Owner Map (initial)
@@ -284,6 +224,6 @@ Day 6–7 (P1 Integration):
 ===============================================================================
 11) Notes
 ===============================================================================
-- Crypto primitives are scaffolds; production crypto must be vetted.
-- Keep README professional; marketing content is under “OpenCloud Universal Deployment”.
-- This tracker is the single source of truth for P0/P1/P2 progress. Update daily.
+- Crypto primitives remain scaffolds; production systems must use vetted libraries.
+- README contains both technical and marketing sections; keep it focused.
+- Update this tracker daily; it is the authoritative plan.

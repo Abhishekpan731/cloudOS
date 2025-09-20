@@ -105,7 +105,10 @@ typedef struct
     uint32_t compression_type; // Compression algorithm used
     uint64_t extent_start;     // First extent block
     uint64_t extent_count;     // Number of extents
-    uint8_t reserved[64];      // Reserved for future use
+    // Copy-on-Write metadata and direct block mapping
+    uint32_t cow_flags;        // Simple CoW bitmap flags (per-block modulo 32)
+    uint64_t direct_blocks[12];// Direct block pointers (simplified)
+    uint8_t reserved[12];      // Reserved to keep inode size within CLOUDFS_INODE_SIZE (256)
 } __attribute__((packed)) cloudfs_inode_t;
 
 // CloudFS Extent (for large files)
@@ -418,6 +421,28 @@ static int cloudfs_stat(const char *path, struct stat *st)
     (void)st;
     // TODO: Implement file stat
     return -1;
+}
+
+/**
+ * Helpers required by CoW path
+ */
+
+// Allocate a new block (wrapper to existing allocator)
+static uint32_t cloudfs_allocate_block(void)
+{
+    uint64_t b = cloudfs_alloc_block();
+    if (b == 0 || b >= (uint64_t)cloudfs_sb->block_count)
+        return 0;
+    return (uint32_t)b;
+}
+
+// Map a block number to its cache pointer (simplified)
+static uint8_t *cloudfs_get_block(uint64_t block_num)
+{
+    if (!cloudfs_sb || !cloudfs_block_cache) return NULL;
+    if (block_num >= cloudfs_sb->block_count) return NULL;
+    uint64_t idx = (block_num % cloudfs_cache_size) * CLOUDFS_BLOCK_SIZE;
+    return cloudfs_block_cache + idx;
 }
 
 // Copy-on-Write (CoW) support for CloudFS
